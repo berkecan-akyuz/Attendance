@@ -1,11 +1,12 @@
 import os
 from datetime import datetime
 from typing import Tuple
+from urllib.parse import quote_plus
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import text
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .models import Lecture, Student, Teacher, User, UserLecture, db
 
@@ -14,15 +15,31 @@ ALLOWED_ROLES = {"ADMIN", "TEACHER", "STUDENT"}
 
 
 def build_mssql_uri() -> str:
+    dsn = os.getenv("SQLSERVER_ODBC_DSN")
+    if dsn:
+        parts = [f"DSN={dsn}", "TrustServerCertificate=Yes"]
+        user = os.getenv("SQLSERVER_USER")
+        password = os.getenv("SQLSERVER_PASSWORD")
+        if user:
+            parts.append(f"UID={user}")
+        if password:
+            parts.append(f"PWD={password}")
+        return f"mssql+pyodbc:///?odbc_connect={quote_plus(';'.join(parts))}"
+
     user = os.getenv("SQLSERVER_USER", "sa")
     password = os.getenv("SQLSERVER_PASSWORD", "YourStrong!Passw0rd")
     host = os.getenv("SQLSERVER_HOST", "localhost")
     port = os.getenv("SQLSERVER_PORT", "1433")
     database = os.getenv("SQLSERVER_DATABASE", "ATTENDANCE")
     driver = os.getenv("SQLSERVER_DRIVER", "ODBC Driver 18 for SQL Server")
+
+    odbc_connect = os.getenv("SQLSERVER_ODBC_CONNECT")
+    if odbc_connect:
+        return f"mssql+pyodbc:///?odbc_connect={quote_plus(odbc_connect)}"
+
     return (
-        f"mssql+pyodbc://@{host}:{port}/{database}"
-        f"?driver={driver.replace(' ', '+')}&trusted_connection=yes&TrustServerCertificate=yes"
+        f"mssql+pyodbc://{user}:{password}@{host}:{port}/{database}"
+        f"?driver={driver.replace(' ', '+')}&TrustServerCertificate=yes"
     )
 
 
@@ -96,6 +113,29 @@ def register_routes(app: Flask) -> None:
         db.session.add(user)
         db.session.commit()
         return jsonify(user.to_dict()), 201
+
+    @app.route("/api/login", methods=["POST"])
+    def login():
+        data = request.get_json() or {}
+        username = (data.get("username") or "").strip()
+        password = data.get("password")
+
+        if not username or not password:
+            return error_response("Username and password are required", 400)
+
+        user = User.query.filter(User.username.ilike(username)).first()
+        if not user or not check_password_hash(user.password_hash, password):
+            return error_response("Invalid username or password", 401)
+        if not user.is_active:
+            return error_response("Account is disabled", 403)
+
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+
+        payload = user.to_dict()
+        payload["role"] = user.role
+        payload["last_login"] = user.last_login.isoformat() if user.last_login else None
+        return jsonify(payload)
 
     @app.route("/api/users", methods=["GET"])
     def list_users():

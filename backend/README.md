@@ -17,6 +17,10 @@ A Flask + SQLAlchemy backend wired to Microsoft SQL Server. The schema mirrors `
    export SQLSERVER_PASSWORD=YourStrong!Passw0rd
    export SQLSERVER_DATABASE=ATTENDANCE
    export SQLSERVER_DRIVER="ODBC Driver 18 for SQL Server"
+   # Optional: prefer an existing ODBC DSN instead of passing host/port
+   export SQLSERVER_ODBC_DSN=MyAttendanceDsn
+   # Or pass a full ODBC connection string
+   export SQLSERVER_ODBC_CONNECT="Driver={ODBC Driver 18 for SQL Server};Server=tcp:localhost,1433;Database=ATTENDANCE;TrustServerCertificate=Yes;UID=sa;PWD=YourStrong!Passw0rd"
    # or provide DATABASE_URL directly if you already have a full SQLAlchemy URI
    ```
 4. Create the schema in your SQL Server instance (once per database):
@@ -33,6 +37,7 @@ The server listens on `http://0.0.0.0:5000` by default. Override with `PORT`.
 ## Available Endpoints
 
 - `GET /api/health` — health check (includes DB connectivity flag).
+- `POST /api/login` — authenticate a user (validates username/password against the DB).
 - `POST /api/users` — create a user (roles: `Admin`, `Teacher`, `Student`).
 - `GET /api/users` — list users, optionally filter by `?role=`.
 - `POST /api/students` — create a student profile for a `Student` user (requires `face_embeddings`).

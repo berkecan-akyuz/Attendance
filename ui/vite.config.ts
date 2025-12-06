@@ -48,21 +48,19 @@ export default defineConfig({
       '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
       '@': path.resolve(__dirname, './src'),
     },
-  },
-  build: {
-    target: 'esnext',
-    outDir: 'build',
-  },
-  server: {
-    port: 3000,
-    open: true,
-    // Add this proxy configuration
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:5000',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
-  },
-});
+    build: {
+      target: 'esnext',
+      outDir: 'build',
+    },
+    server: {
+      port: 3000,
+      host: true,
+      open: true,
+      proxy: {
+        "/api": {
+          target: process.env.VITE_BACKEND_URL || "http://localhost:5000",
+          changeOrigin: true,
+        },
+      },
+    },
+  });
