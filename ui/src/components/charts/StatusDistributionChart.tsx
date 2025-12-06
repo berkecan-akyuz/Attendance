@@ -1,10 +1,8 @@
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const data = [
-  { name: 'Present', value: 420, percentage: 84 },
-  { name: 'Absent', value: 50, percentage: 10 },
-  { name: 'Late', value: 30, percentage: 6 },
-];
+interface StatusDistributionChartProps {
+  data?: Array<{ name: string; value: number; percentage?: number }>;
+}
 
 const COLORS = {
   Present: '#10b981',
@@ -12,12 +10,19 @@ const COLORS = {
   Late: '#f59e0b',
 };
 
-export function StatusDistributionChart() {
+export function StatusDistributionChart({ data = [] }: StatusDistributionChartProps) {
+  const chartData = data.length
+    ? data
+    : [
+        { name: 'Present', value: 420, percentage: 84 },
+        { name: 'Absent', value: 50, percentage: 10 },
+        { name: 'Late', value: 30, percentage: 6 },
+      ];
   return (
     <ResponsiveContainer width="100%" height={300}>
       <PieChart>
         <Pie
-          data={data}
+          data={chartData}
           cx="50%"
           cy="50%"
           labelLine={false}

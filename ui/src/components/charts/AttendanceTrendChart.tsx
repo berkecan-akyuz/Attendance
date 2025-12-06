@@ -1,22 +1,27 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const data = [
-  { date: 'Mon', attendance: 92 },
-  { date: 'Tue', attendance: 88 },
-  { date: 'Wed', attendance: 95 },
-  { date: 'Thu', attendance: 90 },
-  { date: 'Fri', attendance: 82 },
-  { date: 'Sat', attendance: 94 },
-  { date: 'Sun', attendance: 89 },
-];
+interface AttendanceTrendChartProps {
+  data?: Array<{ date: string; attendance: number }>;
+}
 
-export function AttendanceTrendChart() {
+export function AttendanceTrendChart({ data = [] }: AttendanceTrendChartProps) {
+  const chartData = data.length
+    ? data
+    : [
+        { date: 'Mon', attendance: 92 },
+        { date: 'Tue', attendance: 88 },
+        { date: 'Wed', attendance: 95 },
+        { date: 'Thu', attendance: 90 },
+        { date: 'Fri', attendance: 82 },
+        { date: 'Sat', attendance: 94 },
+        { date: 'Sun', attendance: 89 },
+      ];
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={data}>
+      <LineChart data={chartData}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis 
-          dataKey="date" 
+        <XAxis
+          dataKey="date"
           tick={{ fontSize: 12 }}
           stroke="#888"
         />
