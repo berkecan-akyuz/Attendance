@@ -15,7 +15,7 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -24,12 +24,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) return;
+    if (!email || !password) return;
     setError(null);
     setIsLoading(true);
 
     try {
-      const payload = await loginUser(username, password);
+      const payload = await loginUser(email, password, role || undefined);
       const normalizedRole = payload.role?.toLowerCase() || role;
       onLogin(normalizedRole);
     } catch (err) {
@@ -82,17 +82,17 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </Select>
             </div>
 
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Email</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   required
                 />

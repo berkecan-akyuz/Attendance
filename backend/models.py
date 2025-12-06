@@ -5,6 +5,8 @@ from sqlalchemy import UniqueConstraint
 
 
 # SQLAlchemy instance
+# The schema aligns with database/ATTENDANCE.sql for SQL Server
+# (table names and column names match the script).
 db = SQLAlchemy()
 
 
@@ -23,16 +25,18 @@ class User(db.Model):
     last_login = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
 
-    # We explicitly define foreign_keys to tell SQLAlchemy this relationship
-    # uses Student.user_id, NOT Student.registered_by
     student = db.relationship(
-        "Student", 
-        back_populates="user", 
-        uselist=False, 
-        foreign_keys="Student.user_id"
+        "Student",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="Student.user_id",
     )
-    
-    teacher = db.relationship("Teacher", back_populates="user", uselist=False)
+    teacher = db.relationship(
+        "Teacher",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="Teacher.user_id",
+    )
     enrollments = db.relationship("UserLecture", back_populates="user")
 
     def to_dict(self):
@@ -61,10 +65,9 @@ class Student(db.Model):
     face_image_path = db.Column(db.String(255))
     enrollment_status = db.Column(db.String(20), default="Active")
 
-    # Explicit foreign keys to resolve ambiguity
     user = db.relationship("User", foreign_keys=[user_id], back_populates="student")
     registered_by_user = db.relationship("User", foreign_keys=[registered_by])
-    
+    enrollments = db.relationship("UserLecture", back_populates="student")
     faces = db.relationship("FaceDataset", back_populates="student")
 
     def to_dict(self):
@@ -157,6 +160,12 @@ class UserLecture(db.Model):
 
     user = db.relationship("User", back_populates="enrollments")
     lecture = db.relationship("Lecture", back_populates="enrollments")
+    student = db.relationship(
+        "Student",
+        primaryjoin="UserLecture.user_id==Student.user_id",
+        foreign_keys=[user_id],
+        viewonly=True,
+    )
 
     def to_dict(self):
         return {

@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .models import Lecture, Student, Teacher, User, UserLecture, db
@@ -117,15 +117,19 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/login", methods=["POST"])
     def login():
         data = request.get_json() or {}
-        username = (data.get("username") or "").strip()
+        identifier = (data.get("username") or data.get("email") or "").strip()
         password = data.get("password")
+        requested_role = (data.get("role") or "").strip().lower()
 
-        if not username or not password:
-            return error_response("Username and password are required", 400)
+        if not identifier or not password:
+            return error_response("Email and password are required", 400)
 
-        user = User.query.filter(User.username.ilike(username)).first()
+        user = User.query.filter(or_(User.username.ilike(identifier), User.email.ilike(identifier))).first()
+
         if not user or not check_password_hash(user.password_hash, password):
-            return error_response("Invalid username or password", 401)
+            return error_response("Invalid email or password", 401)
+        if requested_role and user.role.lower() != requested_role:
+            return error_response("Role mismatch for this account", 403)
         if not user.is_active:
             return error_response("Account is disabled", 403)
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
@@ -16,6 +16,7 @@ import {
 } from "./ui/table";
 import { AddEditUserModal } from "./AddEditUserModal";
 import { DeleteUserDialog } from "./DeleteUserDialog";
+import { createTeacher, createUser, fetchUsers } from "../lib/api";
 import {
   ArrowLeft,
   Search,
@@ -52,84 +53,37 @@ export function UserManagement({ onBack }: UserManagementProps) {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: "1",
-      name: "Admin User",
-      email: "admin@attendance.com",
-      role: "admin",
-      photo: "",
-      status: true,
-      lastLogin: "2 hours ago",
-    },
-    {
-      id: "2",
-      name: "John Teacher",
-      email: "john.teacher@school.com",
-      role: "teacher",
-      department: "Computer Science",
-      photo: "",
-      status: true,
-      lastLogin: "1 hour ago",
-    },
-    {
-      id: "3",
-      name: "Sarah Williams",
-      email: "sarah.williams@school.com",
-      role: "teacher",
-      department: "Mathematics",
-      photo: "",
-      status: true,
-      lastLogin: "3 hours ago",
-    },
-    {
-      id: "4",
-      name: "Emma Student",
-      email: "emma.student@school.com",
-      role: "student",
-      photo: "",
-      status: true,
-      lastLogin: "30 minutes ago",
-    },
-    {
-      id: "5",
-      name: "Michael Brown",
-      email: "michael.brown@school.com",
-      role: "student",
-      photo: "",
-      status: true,
-      lastLogin: "1 day ago",
-    },
-    {
-      id: "6",
-      name: "Lisa Anderson",
-      email: "lisa.anderson@school.com",
-      role: "teacher",
-      department: "English",
-      photo: "",
-      status: false,
-      lastLogin: "2 weeks ago",
-    },
-    {
-      id: "7",
-      name: "David Wilson",
-      email: "david.wilson@school.com",
-      role: "student",
-      photo: "",
-      status: true,
-      lastLogin: "5 hours ago",
-    },
-    {
-      id: "8",
-      name: "Jennifer Garcia",
-      email: "jennifer.garcia@school.com",
-      role: "student",
-      photo: "",
-      status: false,
-      lastLogin: "1 month ago",
-    },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const serverUsers = await fetchUsers();
+        const mapped = serverUsers.map((u) => ({
+          id: String(u.user_id),
+          name: u.full_name || u.username,
+          email: u.email || u.username,
+          role: (u.role || "student").toLowerCase() as User["role"],
+          department: undefined,
+          photo: "",
+          status: u.is_active ?? true,
+          lastLogin: u.last_login || "Never",
+        }));
+        setUsers(mapped);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load users";
+        setError(message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const stats = {
     totalUsers: users.length,
@@ -186,27 +140,46 @@ export function UserManagement({ onBack }: UserManagementProps) {
     setAddEditModalOpen(true);
   };
 
-  const handleSaveUser = (userData: Partial<User>) => {
-    if (editingUser) {
-      // Update existing user
+  const handleSaveUser = async (userData: Partial<User>) => {
+    setError(null);
+    if (!editingUser) {
+      try {
+        const created = await createUser({
+          username: userData.email || "", // email is used as the username
+          email: userData.email || undefined,
+          password: userData.password || "TempPass123!",
+          role: (userData.role || "student").toString(),
+          full_name: userData.name,
+        });
+
+        if (userData.role === "teacher") {
+          await createTeacher({
+            user_id: created.user_id,
+            department: userData.department,
+          });
+        }
+
+        const newUser: User = {
+          id: String(created.user_id),
+          name: created.full_name || created.username,
+          email: created.email || created.username,
+          role: (created.role || "student").toLowerCase() as User["role"],
+          department: userData.department,
+          photo: userData.photo || "",
+          status: created.is_active ?? true,
+          lastLogin: created.last_login || "Never",
+        };
+        setUsers([...users, newUser]);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to save user";
+        setError(message);
+      }
+    } else {
       setUsers(
         users.map((user) =>
           user.id === editingUser.id ? { ...user, ...userData } : user
         )
       );
-    } else {
-      // Add new user
-      const newUser: User = {
-        id: String(users.length + 1),
-        name: userData.name || "",
-        email: userData.email || "",
-        role: userData.role || "student",
-        department: userData.department,
-        photo: userData.photo || "",
-        status: userData.status !== undefined ? userData.status : true,
-        lastLogin: "Never",
-      };
-      setUsers([...users, newUser]);
     }
     setAddEditModalOpen(false);
     setEditingUser(null);
@@ -248,6 +221,12 @@ export function UserManagement({ onBack }: UserManagementProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="p-6">
