@@ -5,11 +5,21 @@ from urllib.parse import quote_plus
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from sqlalchemy import func, or_, text
+from sqlalchemy import case, func, or_, text
 from sqlalchemy.exc import DBAPIError, OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .models import Lecture, Student, Teacher, User, UserLecture, db
+from .models import (
+    AttendanceSession,
+    Camera,
+    Lecture,
+    Student,
+    StudentAttendance,
+    Teacher,
+    User,
+    UserLecture,
+    db,
+)
 
 
 ALLOWED_ROLES = {"ADMIN", "TEACHER", "STUDENT"}
@@ -92,6 +102,10 @@ def get_lecture_and_user(lecture_id: int, user_id: int) -> Tuple[Lecture, User]:
     lecture = Lecture.query.get(lecture_id)
     user = User.query.get(user_id)
     return lecture, user
+
+
+def get_teacher_by_user_id(user_id: int) -> Teacher | None:
+    return Teacher.query.filter_by(user_id=user_id).first()
 
 
 def register_routes(app: Flask) -> None:
@@ -218,6 +232,82 @@ def register_routes(app: Flask) -> None:
         students = Student.query.order_by(Student.student_id.asc()).all()
         return jsonify([student.to_dict() for student in students])
 
+    @app.route("/api/students/<int:user_id>/dashboard", methods=["GET"])
+    def student_dashboard(user_id: int):
+        student = Student.query.filter_by(user_id=user_id).first()
+        if not student:
+            return error_response("Student profile not found", 404)
+
+        enrollments = (
+            db.session.query(UserLecture, Lecture)
+            .join(Lecture, Lecture.lecture_id == UserLecture.lecture_id)
+            .filter(UserLecture.user_id == user_id, UserLecture.is_teacher.is_(False))
+            .all()
+        )
+
+        attendance_records = (
+            db.session.query(StudentAttendance, AttendanceSession, Lecture)
+            .join(AttendanceSession, AttendanceSession.session_id == StudentAttendance.session_id)
+            .join(Lecture, Lecture.lecture_id == AttendanceSession.lecture_id)
+            .filter(StudentAttendance.user_id == user_id)
+            .order_by(AttendanceSession.session_date.desc(), AttendanceSession.session_start_time.desc())
+            .limit(60)
+            .all()
+        )
+
+        def status_count(status: str) -> int:
+            return (
+                db.session.query(func.count(StudentAttendance.attendance_id))
+                .join(AttendanceSession, AttendanceSession.session_id == StudentAttendance.session_id)
+                .filter(StudentAttendance.user_id == user_id, StudentAttendance.status.ilike(status))
+                .scalar()
+                or 0
+            )
+
+        present = status_count("present")
+        absent = status_count("absent")
+        late = status_count("late")
+        unknown = status_count("unknown")
+        total_sessions = present + absent + late + unknown
+
+        return jsonify(
+            {
+                "student": student.to_dict(),
+                "enrollments": [
+                    {
+                        "lecture_id": lecture.lecture_id,
+                        "lecture_name": lecture.lecture_name,
+                        "course_code": lecture.course_code,
+                        "department": lecture.department,
+                        "schedule": lecture.schedule,
+                        "room_number": lecture.room_number,
+                        "semester": lecture.semester,
+                        "year": lecture.year,
+                    }
+                    for _, lecture in enrollments
+                ],
+                "attendance": {
+                    "present": present,
+                    "absent": absent,
+                    "late": late,
+                    "unknown": unknown,
+                    "percentage": (present / total_sessions * 100) if total_sessions else 0,
+                },
+                "recent_records": [
+                    {
+                        "attendance_id": record.attendance_id,
+                        "session_id": session.session_id,
+                        "lecture": lecture.lecture_name,
+                        "status": record.status.lower(),
+                        "session_date": session.session_date.isoformat() if session.session_date else None,
+                        "time_in": record.time_in.isoformat() if record.time_in else None,
+                        "verification_method": record.verification_method,
+                    }
+                    for record, session, lecture in attendance_records
+                ],
+            }
+        )
+
     @app.route("/api/stats/overview", methods=["GET"])
     def overview_stats():
         totals = {
@@ -228,6 +318,66 @@ def register_routes(app: Flask) -> None:
             "total_enrollments": db.session.query(func.count(UserLecture.user_id)).scalar() or 0,
         }
         return jsonify(totals)
+
+    @app.route("/api/lectures/summary", methods=["GET"])
+    def lecture_summary():
+        teacher_user_id = request.args.get("teacher_user_id", type=int)
+        teacher_id = request.args.get("teacher_id", type=int)
+
+        if teacher_user_id and not teacher_id:
+            teacher = get_teacher_by_user_id(teacher_user_id)
+            if not teacher:
+                return error_response("Teacher profile not found", 404)
+            teacher_id = teacher.teacher_id
+
+        lecture_query = Lecture.query
+        if teacher_id:
+            lecture_query = lecture_query.filter(Lecture.teacher_id == teacher_id)
+
+        enrollment_counts = {
+            row.lecture_id: row.count
+            for row in (
+                db.session.query(
+                    UserLecture.lecture_id,
+                    func.count(UserLecture.user_id).label("count"),
+                )
+                .filter(UserLecture.is_teacher.is_(False))
+                .group_by(UserLecture.lecture_id)
+                .all()
+            )
+        }
+
+        camera_map = {
+            camera.assigned_lecture_id: camera for camera in Camera.query.all()
+        }
+
+        lectures = lecture_query.order_by(Lecture.lecture_id.asc()).all()
+        payload = []
+        for lecture in lectures:
+            teacher_user = lecture.teacher.user if lecture.teacher else None
+            camera = camera_map.get(lecture.lecture_id)
+            payload.append(
+                {
+                    "lecture_id": lecture.lecture_id,
+                    "lecture_name": lecture.lecture_name,
+                    "course_code": lecture.course_code,
+                    "department": lecture.department,
+                    "semester": lecture.semester,
+                    "year": lecture.year,
+                    "room_number": lecture.room_number,
+                    "schedule": lecture.schedule,
+                    "capacity": lecture.capacity,
+                    "teacher": {
+                        "teacher_id": lecture.teacher.teacher_id if lecture.teacher else None,
+                        "full_name": teacher_user.full_name if teacher_user else None,
+                        "email": teacher_user.email if teacher_user else None,
+                    },
+                    "enrolled": enrollment_counts.get(lecture.lecture_id, 0),
+                    "camera": camera.to_dict() if camera else None,
+                }
+            )
+
+        return jsonify(payload)
 
     @app.route("/api/stats/teacher/<int:user_id>", methods=["GET"])
     def teacher_stats(user_id: int):
@@ -255,6 +405,122 @@ def register_routes(app: Flask) -> None:
                 "teacher_id": teacher.teacher_id,
                 "classes": class_count,
                 "students": student_count,
+            }
+        )
+
+    @app.route("/api/reports/attendance", methods=["GET"])
+    def attendance_reports():
+        teacher_user_id = request.args.get("teacher_user_id", type=int)
+        teacher_id = None
+        if teacher_user_id:
+            teacher = get_teacher_by_user_id(teacher_user_id)
+            if not teacher:
+                return error_response("Teacher profile not found", 404)
+            teacher_id = teacher.teacher_id
+
+        attendance_query = (
+            db.session.query(StudentAttendance)
+            .join(AttendanceSession, AttendanceSession.session_id == StudentAttendance.session_id)
+            .join(Lecture, Lecture.lecture_id == AttendanceSession.lecture_id)
+        )
+        if teacher_id:
+            attendance_query = attendance_query.filter(Lecture.teacher_id == teacher_id)
+
+        total_records = attendance_query.count()
+        present = attendance_query.filter(StudentAttendance.status.ilike("present")).count()
+        absent = attendance_query.filter(StudentAttendance.status.ilike("absent")).count()
+        late = attendance_query.filter(StudentAttendance.status.ilike("late")).count()
+        unknown = attendance_query.filter(StudentAttendance.status.ilike("unknown")).count()
+
+        class_breakdown = (
+            db.session.query(
+                Lecture.lecture_id,
+                Lecture.lecture_name,
+                func.count(StudentAttendance.attendance_id).label("total"),
+                func.sum(case((StudentAttendance.status.ilike("present"), 1), else_=0)).label(
+                    "present"
+                ),
+                func.sum(case((StudentAttendance.status.ilike("absent"), 1), else_=0)).label(
+                    "absent"
+                ),
+                func.sum(case((StudentAttendance.status.ilike("late"), 1), else_=0)).label(
+                    "late"
+                ),
+            )
+            .join(AttendanceSession, AttendanceSession.lecture_id == Lecture.lecture_id)
+            .join(StudentAttendance, StudentAttendance.session_id == AttendanceSession.session_id)
+        )
+        if teacher_id:
+            class_breakdown = class_breakdown.filter(Lecture.teacher_id == teacher_id)
+
+        class_results = (
+            class_breakdown.group_by(Lecture.lecture_id, Lecture.lecture_name)
+            .order_by(func.count(StudentAttendance.attendance_id).desc())
+            .all()
+        )
+
+        recent_sessions = (
+            db.session.query(
+                AttendanceSession,
+                Lecture.lecture_name,
+                func.sum(case((StudentAttendance.status.ilike("present"), 1), else_=0)).label(
+                    "present"
+                ),
+                func.sum(case((StudentAttendance.status.ilike("absent"), 1), else_=0)).label(
+                    "absent"
+                ),
+                func.sum(case((StudentAttendance.status.ilike("late"), 1), else_=0)).label(
+                    "late"
+                ),
+            )
+            .join(Lecture, Lecture.lecture_id == AttendanceSession.lecture_id)
+            .join(StudentAttendance, StudentAttendance.session_id == AttendanceSession.session_id)
+        )
+        if teacher_id:
+            recent_sessions = recent_sessions.filter(Lecture.teacher_id == teacher_id)
+
+        recent_results = (
+            recent_sessions.group_by(AttendanceSession.session_id, Lecture.lecture_name)
+            .order_by(AttendanceSession.session_date.desc())
+            .limit(10)
+            .all()
+        )
+
+        return jsonify(
+            {
+                "average_attendance": (present / total_records * 100) if total_records else 0,
+                "total_records": total_records,
+                "status": {
+                    "present": present,
+                    "absent": absent,
+                    "late": late,
+                    "unknown": unknown,
+                },
+                "classes": [
+                    {
+                        "lecture_id": row.lecture_id,
+                        "lecture_name": row.lecture_name,
+                        "total": row.total,
+                        "present": row.present or 0,
+                        "absent": row.absent or 0,
+                        "late": row.late or 0,
+                    }
+                    for row in class_results
+                ],
+                "recent_sessions": [
+                    {
+                        "session_id": session.session_id,
+                        "lecture_name": lecture_name,
+                        "session_date": session.session_date.isoformat()
+                        if session.session_date
+                        else None,
+                        "present": present or 0,
+                        "absent": absent or 0,
+                        "late": late or 0,
+                        "status": session.status,
+                    }
+                    for session, lecture_name, present, absent, late in recent_results
+                ],
             }
         )
 
@@ -415,6 +681,17 @@ def register_routes(app: Flask) -> None:
             record["user"] = enrollment.user.to_dict() if enrollment.user else None
             result.append(record)
         return jsonify(result)
+
+    @app.route("/api/cameras", methods=["GET"])
+    def list_cameras():
+        cameras = Camera.query.order_by(Camera.camera_id.asc()).all()
+        payload = []
+        for camera in cameras:
+            entry = camera.to_dict()
+            if camera.lecture:
+                entry["lecture_name"] = camera.lecture.lecture_name
+            payload.append(entry)
+        return jsonify(payload)
 
 
 app = create_app()

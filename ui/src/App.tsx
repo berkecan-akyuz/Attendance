@@ -111,9 +111,10 @@ export default function App() {
         />
       )}
       {currentPage === "reports" && (
-        <ReportsAnalytics 
+        <ReportsAnalytics
           onBack={handleBackToDashboard}
           userRole={userRole as "admin" | "teacher"}
+          userId={auth?.user_id}
           onLogout={handleLogout}
           onNavigateToSettings={handleNavigateToSettings}
           onNavigateToNotifications={handleNavigateToNotifications}
@@ -122,7 +123,8 @@ export default function App() {
         />
       )}
       {currentPage === "student" && userRole === "student" && (
-        <StudentPortal 
+        <StudentPortal
+          userId={auth?.user_id}
           onLogout={handleLogout}
           onNavigateToNotifications={handleNavigateToNotifications}
         />

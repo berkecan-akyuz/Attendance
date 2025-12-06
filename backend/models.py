@@ -135,6 +135,8 @@ class Lecture(db.Model):
 
     teacher = db.relationship("Teacher", back_populates="lectures")
     enrollments = db.relationship("UserLecture", back_populates="lecture")
+    cameras = db.relationship("Camera", back_populates="lecture")
+    sessions = db.relationship("AttendanceSession", back_populates="lecture")
 
     def to_dict(self):
         return {
@@ -181,6 +183,114 @@ class UserLecture(db.Model):
             "is_teacher": self.is_teacher,
             "enrolled_at": self.enrolled_at.isoformat() if self.enrolled_at else None,
             "enrollment_status": self.enrollment_status,
+        }
+
+
+class Camera(db.Model):
+    __tablename__ = "Camera"
+
+    camera_id = db.Column(db.Integer, primary_key=True)
+    camera_name = db.Column(db.String(100), nullable=False)
+    location = db.Column(db.String(150), nullable=False)
+    stream_url = db.Column(db.String(255), nullable=False)
+    assigned_lecture_id = db.Column(db.Integer, db.ForeignKey("Lecture.lecture_id"))
+    status = db.Column(db.String(20), default="Online")
+    last_checked = db.Column(db.DateTime)
+
+    lecture = db.relationship("Lecture", back_populates="cameras")
+
+    def to_dict(self):
+        return {
+            "camera_id": self.camera_id,
+            "camera_name": self.camera_name,
+            "location": self.location,
+            "stream_url": self.stream_url,
+            "assigned_lecture_id": self.assigned_lecture_id,
+            "status": self.status,
+            "last_checked": self.last_checked.isoformat() if self.last_checked else None,
+            "lecture": self.lecture.to_dict() if self.lecture else None,
+        }
+
+
+class AttendanceSession(db.Model):
+    __tablename__ = "Attendance_Session"
+
+    session_id = db.Column(db.Integer, primary_key=True)
+    lecture_id = db.Column(db.Integer, db.ForeignKey("Lecture.lecture_id"), nullable=False)
+    camera_id = db.Column(db.Integer, db.ForeignKey("Camera.camera_id"))
+    session_date = db.Column(db.Date)
+    session_start_time = db.Column(db.Time)
+    session_end_time = db.Column(db.Time)
+    status = db.Column(db.String(20), default="Scheduled")
+    attendance_locked = db.Column(db.Boolean, default=False)
+    locked_by = db.Column(db.Integer, db.ForeignKey("User.user_id"))
+    locked_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    completed_at = db.Column(db.DateTime)
+    notes = db.Column(db.Text)
+
+    lecture = db.relationship("Lecture", back_populates="sessions")
+    camera = db.relationship("Camera")
+    locked_by_user = db.relationship("User", foreign_keys=[locked_by])
+    attendance_records = db.relationship("StudentAttendance", back_populates="session")
+
+    def to_dict(self):
+        return {
+            "session_id": self.session_id,
+            "lecture_id": self.lecture_id,
+            "camera_id": self.camera_id,
+            "session_date": self.session_date.isoformat() if self.session_date else None,
+            "session_start_time": self.session_start_time.isoformat() if self.session_start_time else None,
+            "session_end_time": self.session_end_time.isoformat() if self.session_end_time else None,
+            "status": self.status,
+            "attendance_locked": self.attendance_locked,
+            "locked_by": self.locked_by,
+            "locked_at": self.locked_at.isoformat() if self.locked_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "notes": self.notes,
+        }
+
+
+class StudentAttendance(db.Model):
+    __tablename__ = "Student_Attendance"
+
+    attendance_id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey("Attendance_Session.session_id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("User.user_id"), nullable=False)
+    time_in = db.Column(db.Time)
+    time_out = db.Column(db.Time)
+    status = db.Column(db.String(20), default="Absent")
+    verification_method = db.Column(db.String(30), default="Face Recognition")
+    verified_by = db.Column(db.Integer, db.ForeignKey("User.user_id"))
+    confidence_score = db.Column(db.Float)
+    manual_override = db.Column(db.Boolean, default=False)
+    edited_by = db.Column(db.Integer, db.ForeignKey("User.user_id"))
+    edited_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    notes = db.Column(db.Text)
+
+    session = db.relationship("AttendanceSession", back_populates="attendance_records")
+    user = db.relationship("User", foreign_keys=[user_id])
+    verified_by_user = db.relationship("User", foreign_keys=[verified_by])
+    edited_by_user = db.relationship("User", foreign_keys=[edited_by])
+
+    def to_dict(self):
+        return {
+            "attendance_id": self.attendance_id,
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "time_in": self.time_in.isoformat() if self.time_in else None,
+            "time_out": self.time_out.isoformat() if self.time_out else None,
+            "status": self.status,
+            "verification_method": self.verification_method,
+            "verified_by": self.verified_by,
+            "confidence_score": self.confidence_score,
+            "manual_override": self.manual_override,
+            "edited_by": self.edited_by,
+            "edited_at": self.edited_at.isoformat() if self.edited_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "notes": self.notes,
         }
 
 

@@ -39,6 +39,80 @@ export interface TeacherStats {
   students: number;
 }
 
+export interface LectureSummary {
+  lecture_id: number;
+  lecture_name: string;
+  course_code?: string;
+  department?: string;
+  room_number?: string;
+  schedule?: string;
+  semester?: number | string;
+  year?: number | string;
+  capacity?: number;
+  enrolled: number;
+  teacher?: { teacher_id: number | null; full_name?: string | null; email?: string | null };
+  camera?: CameraResponse | null;
+}
+
+export interface AttendanceReports {
+  average_attendance: number;
+  total_records: number;
+  status: { present: number; absent: number; late: number; unknown: number };
+  classes: Array<{
+    lecture_id: number;
+    lecture_name: string;
+    total: number;
+    present: number;
+    absent: number;
+    late: number;
+  }>;
+  recent_sessions: Array<{
+    session_id: number;
+    lecture_name: string;
+    session_date: string | null;
+    present: number;
+    absent: number;
+    late: number;
+    status: string;
+  }>;
+}
+
+export interface StudentDashboard {
+  student: any;
+  enrollments: Array<{
+    lecture_id: number;
+    lecture_name: string;
+    course_code?: string;
+    department?: string;
+    schedule?: string;
+    room_number?: string;
+    semester?: string | number;
+    year?: string | number;
+  }>;
+  attendance: { present: number; absent: number; late: number; unknown: number; percentage: number };
+  recent_records: Array<{
+    attendance_id: number;
+    session_id: number;
+    lecture: string;
+    status: string;
+    session_date: string | null;
+    time_in: string | null;
+    verification_method: string;
+  }>;
+}
+
+export interface CameraResponse {
+  camera_id: number;
+  camera_name: string;
+  location: string;
+  stream_url: string;
+  assigned_lecture_id: number | null;
+  status: string;
+  last_checked: string | null;
+  lecture?: any;
+  lecture_name?: string;
+}
+
 export async function loginUser(email: string, password: string, role?: string): Promise<AuthPayload> {
   const response = await fetch(withBase("/api/login"), {
     method: "POST",
@@ -169,6 +243,48 @@ export async function fetchTeacherStudents(userId: number): Promise<
     lecture: string;
     enrollment_status: string;
   }>;
+}
+
+export async function fetchLectureSummaries(options?: { teacherUserId?: number }): Promise<LectureSummary[]> {
+  const query = options?.teacherUserId ? `?teacher_user_id=${options.teacherUserId}` : "";
+  const response = await fetch(withBase(`/api/lectures/summary${query}`));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load classes";
+    throw new Error(message);
+  }
+  return payload as LectureSummary[];
+}
+
+export async function fetchAttendanceReports(teacherUserId?: number): Promise<AttendanceReports> {
+  const query = teacherUserId ? `?teacher_user_id=${teacherUserId}` : "";
+  const response = await fetch(withBase(`/api/reports/attendance${query}`));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load reports";
+    throw new Error(message);
+  }
+  return payload as AttendanceReports;
+}
+
+export async function fetchStudentDashboard(userId: number): Promise<StudentDashboard> {
+  const response = await fetch(withBase(`/api/students/${userId}/dashboard`));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load student data";
+    throw new Error(message);
+  }
+  return payload as StudentDashboard;
+}
+
+export async function fetchCameras(): Promise<CameraResponse[]> {
+  const response = await fetch(withBase("/api/cameras"));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load cameras";
+    throw new Error(message);
+  }
+  return payload as CameraResponse[];
 }
 
 export const API_BASE_URL = normalizedBase || "(proxy)";

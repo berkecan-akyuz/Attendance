@@ -191,7 +191,7 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
       <ClassManagement
         onBack={() => setCurrentPage("attendance")}
         userRole="teacher"
-        teacherId="t1"
+        teacherUserId={userId ?? undefined}
       />
     );
   }
