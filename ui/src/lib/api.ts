@@ -202,6 +202,16 @@ export async function createStudent(input: {
   return payload;
 }
 
+export async function fetchStudents(): Promise<any[]> {
+  const response = await fetch(withBase("/api/students"));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load students";
+    throw new Error(message);
+  }
+  return payload as any[];
+}
+
 export async function createTeacher(input: {
   user_id: number;
   department?: string;
@@ -388,6 +398,58 @@ export async function fetchLectures(): Promise<LecturePayload[]> {
     throw new Error((payload && (payload.error as string)) || "Unable to load lectures");
   }
   return payload as LecturePayload[];
+}
+
+export async function enrollStudentInLecture(
+  lectureId: number,
+  userId: number
+): Promise<any> {
+  const response = await fetch(withBase(`/api/lectures/${lectureId}/enroll`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, is_teacher: false }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to add student to class");
+  }
+  return payload;
+}
+
+export async function fetchLectureStudents(lectureId: number): Promise<any[]> {
+  const response = await fetch(withBase(`/api/lectures/${lectureId}/students`));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load class students";
+    throw new Error(message);
+  }
+  return payload as any[];
+}
+
+export async function fetchLectureAttendanceSummary(
+  lectureId: number
+): Promise<{
+  lecture_id: number;
+  total_records: number;
+  present: number;
+  absent: number;
+  late: number;
+  unknown: number;
+}> {
+  const response = await fetch(withBase(`/api/lectures/${lectureId}/attendance-summary`));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load attendance summary";
+    throw new Error(message);
+  }
+  return payload as {
+    lecture_id: number;
+    total_records: number;
+    present: number;
+    absent: number;
+    late: number;
+    unknown: number;
+  };
 }
 
 export async function fetchNotifications(): Promise<NotificationItem[]> {

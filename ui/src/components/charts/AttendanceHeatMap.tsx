@@ -5,28 +5,13 @@ interface AttendanceHeatMapProps {
 
 export function AttendanceHeatMap({ compact = false, data = [] }: AttendanceHeatMapProps) {
   const generateHeatMapData = () => {
-    if (data.length) {
-      return data.map((item, index) => ({
-        week: Math.floor(index / 7),
-        day: index % 7,
-        attendance: item.attendance,
-      }));
-    }
-    const fallback = [] as { week: number; day: number; attendance: number }[];
-    const weeks = 5;
-    const daysPerWeek = 7;
+    if (!data.length) return [] as { week: number; day: number; attendance: number }[];
 
-    for (let week = 0; week < weeks; week++) {
-      for (let day = 0; day < daysPerWeek; day++) {
-        const attendance = Math.floor(Math.random() * 30) + 70;
-        fallback.push({
-          week,
-          day,
-          attendance,
-        });
-      }
-    }
-    return fallback;
+    return data.map((item, index) => ({
+      week: Math.floor(index / 7),
+      day: index % 7,
+      attendance: item.attendance,
+    }));
   };
 
   const heatMapData = generateHeatMapData();
@@ -40,6 +25,14 @@ export function AttendanceHeatMap({ compact = false, data = [] }: AttendanceHeat
     if (attendance >= 75) return 'bg-yellow-500';
     return 'bg-red-500';
   };
+
+  if (!heatMapData.length) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-gray-500 border border-dashed rounded-lg bg-white">
+        No attendance heat map data available
+      </div>
+    );
+  }
 
   if (compact) {
     return (

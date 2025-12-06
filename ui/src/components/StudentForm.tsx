@@ -12,7 +12,6 @@ interface StudentFormProps {
   formData: {
     fullName: string;
     rollNumber: string;
-    classSection: string;
     department: string;
     email: string;
     phoneNumber: string;
@@ -63,29 +62,6 @@ export function StudentForm({ formData, setFormData }: StudentFormProps) {
             onChange={(e) => handleChange("rollNumber", e.target.value)}
             required
           />
-        </div>
-
-        {/* Class/Section */}
-        <div className="space-y-2">
-          <Label htmlFor="classSection">
-            Class/Section <span className="text-red-500">*</span>
-          </Label>
-          <Select
-            value={formData.classSection}
-            onValueChange={(value) => handleChange("classSection", value)}
-          >
-            <SelectTrigger id="classSection">
-              <SelectValue placeholder="Select class/section" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10-A">10-A</SelectItem>
-              <SelectItem value="10-B">10-B</SelectItem>
-              <SelectItem value="11-A">11-A</SelectItem>
-              <SelectItem value="11-B">11-B</SelectItem>
-              <SelectItem value="12-A">12-A</SelectItem>
-              <SelectItem value="12-B">12-B</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Department */}

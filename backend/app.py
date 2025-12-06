@@ -477,6 +477,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/reports/attendance", methods=["GET"])
     def attendance_reports():
         teacher_user_id = request.args.get("teacher_user_id", type=int)
+        lecture_id = request.args.get("lecture_id", type=int)
         teacher_id = None
         if teacher_user_id:
             teacher = get_teacher_by_user_id(teacher_user_id)
@@ -491,6 +492,8 @@ def register_routes(app: Flask) -> None:
         )
         if teacher_id:
             attendance_query = attendance_query.filter(Lecture.teacher_id == teacher_id)
+        if lecture_id:
+            attendance_query = attendance_query.filter(AttendanceSession.lecture_id == lecture_id)
 
         total_records = attendance_query.count()
         present = attendance_query.filter(StudentAttendance.status.ilike("present")).count()
@@ -518,6 +521,8 @@ def register_routes(app: Flask) -> None:
         )
         if teacher_id:
             class_breakdown = class_breakdown.filter(Lecture.teacher_id == teacher_id)
+        if lecture_id:
+            class_breakdown = class_breakdown.filter(Lecture.lecture_id == lecture_id)
 
         class_results = (
             class_breakdown.group_by(Lecture.lecture_id, Lecture.lecture_name)
@@ -821,6 +826,67 @@ def register_routes(app: Flask) -> None:
         db.session.add(enrollment)
         db.session.commit()
         return jsonify(enrollment.to_dict()), 201
+
+    @app.route("/api/lectures/<int:lecture_id>/students", methods=["GET"])
+    def lecture_students(lecture_id: int):
+        lecture = Lecture.query.get(lecture_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
+
+        enrollments = (
+            db.session.query(Student, User, UserLecture)
+            .join(User, User.user_id == Student.user_id)
+            .join(UserLecture, UserLecture.user_id == Student.user_id)
+            .filter(UserLecture.lecture_id == lecture_id, UserLecture.is_teacher == False)
+            .all()
+        )
+
+        payload = []
+        for student, user, enrollment in enrollments:
+            payload.append(
+                {
+                    "student_id": student.student_id,
+                    "user_id": student.user_id,
+                    "roll_number": student.roll_number,
+                    "full_name": user.full_name,
+                    "email": user.email,
+                    "enrollment_status": enrollment.enrollment_status,
+                    "enrolled_at": enrollment.enrolled_at.isoformat()
+                    if enrollment.enrolled_at
+                    else None,
+                }
+            )
+
+        return jsonify(payload)
+
+    @app.route("/api/lectures/<int:lecture_id>/attendance-summary", methods=["GET"])
+    def lecture_attendance_summary(lecture_id: int):
+        lecture = Lecture.query.get(lecture_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
+
+        attendance_query = (
+            db.session.query(StudentAttendance)
+            .join(AttendanceSession, AttendanceSession.session_id == StudentAttendance.session_id)
+            .filter(AttendanceSession.lecture_id == lecture_id)
+        )
+
+        total_records = attendance_query.count()
+        present = attendance_query.filter(StudentAttendance.status.ilike("present")).count()
+        absent = attendance_query.filter(StudentAttendance.status.ilike("absent")).count()
+        late = attendance_query.filter(StudentAttendance.status.ilike("late")).count()
+        unknown = attendance_query.filter(StudentAttendance.status.ilike("unknown")).count()
+
+        return jsonify(
+            {
+                "lecture_id": lecture_id,
+                "total_records": total_records,
+                "present": present,
+                "absent": absent,
+                "late": late,
+                "unknown": unknown,
+            }
+        )
 
     @app.route("/api/enrollments", methods=["GET"])
     def list_enrollments():

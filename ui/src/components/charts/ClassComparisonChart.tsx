@@ -6,20 +6,15 @@ interface ClassComparisonChartProps {
 }
 
 export function ClassComparisonChart({ userRole, data = [] }: ClassComparisonChartProps) {
-  const chartData = data.length
-    ? data
-    : userRole === "admin"
-    ? [
-        { class: 'CS 10A', attendance: 96 },
-        { class: 'CS 10B', attendance: 92 },
-        { class: 'Math 11A', attendance: 88 },
-        { class: 'Eng 12A', attendance: 94 },
-        { class: 'Sci 11B', attendance: 90 },
-      ]
-    : [
-        { class: 'CS 10A', attendance: 96 },
-        { class: 'CS 10B', attendance: 92 },
-      ];
+  if (!data.length) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-gray-500 border border-dashed rounded-lg bg-white">
+        No class comparison data available
+      </div>
+    );
+  }
+
+  const chartData = data;
 
   return (
     <ResponsiveContainer width="100%" height={300}>
