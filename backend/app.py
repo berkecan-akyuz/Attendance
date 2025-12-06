@@ -4,62 +4,79 @@ from typing import Tuple
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from sqlalchemy import text
 from werkzeug.security import generate_password_hash
 
-from .models import Course, Enrollment, Student, Teacher, User, db
+from .models import Lecture, Student, Teacher, User, UserLecture, db
 
 
-ALLOWED_ROLES = {"admin", "teacher", "student"}
+ALLOWED_ROLES = {"ADMIN", "TEACHER", "STUDENT"}
+
+
+def build_mssql_uri() -> str:
+    user = os.getenv("SQLSERVER_USER", "sa")
+    password = os.getenv("SQLSERVER_PASSWORD", "YourStrong!Passw0rd")
+    host = os.getenv("SQLSERVER_HOST", "localhost")
+    port = os.getenv("SQLSERVER_PORT", "1433")
+    database = os.getenv("SQLSERVER_DATABASE", "ATTENDANCE")
+    driver = os.getenv("SQLSERVER_DRIVER", "ODBC Driver 18 for SQL Server")
+    return (
+        f"mssql+pyodbc://{user}:{password}@{host}:{port}/{database}"
+        f"?driver={driver.replace(' ', '+')}&TrustServerCertificate=yes"
+    )
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    database_url = os.getenv("DATABASE_URL", "sqlite:///attendance.db")
+    database_url = os.getenv("DATABASE_URL") or build_mssql_uri()
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db.init_app(app)
     CORS(app)
 
-    with app.app_context():
-        db.create_all()
-
     register_routes(app)
     return app
 
 
-def validate_role(role: str) -> bool:
-    return role in ALLOWED_ROLES
+def validate_role(role: str) -> Tuple[bool, str]:
+    normalized = (role or "").strip().upper()
+    return normalized in ALLOWED_ROLES, normalized
 
 
 def error_response(message: str, status: int = 400):
     return jsonify({"error": message}), status
 
 
-def get_course_and_teacher(course_id: int, teacher_id: int) -> Tuple[Course, Teacher]:
-    course = Course.query.get(course_id)
-    teacher = Teacher.query.get(teacher_id)
-    return course, teacher
+def get_lecture_and_user(lecture_id: int, user_id: int) -> Tuple[Lecture, User]:
+    lecture = Lecture.query.get(lecture_id)
+    user = User.query.get(user_id)
+    return lecture, user
 
 
 def register_routes(app: Flask) -> None:
     @app.route("/api/health", methods=["GET"])
     def health_check():
-        return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
+        try:
+            db.session.execute(text("SELECT 1"))
+            db.session.commit()
+            db_ok = True
+        except Exception:
+            db.session.rollback()
+            db_ok = False
+        return jsonify({"status": "ok", "database": db_ok, "timestamp": datetime.utcnow().isoformat()})
 
     @app.route("/api/users", methods=["POST"])
     def create_user():
         data = request.get_json() or {}
         username = data.get("username")
         password = data.get("password")
-        role = data.get("role", "").lower()
+        role_ok, role = validate_role(data.get("role"))
 
         if not username or not password:
             return error_response("Username and password are required")
-
-        if not validate_role(role):
-            return error_response("Invalid role. Use admin, teacher, or student.")
-
+        if not role_ok:
+            return error_response("Invalid role. Use Admin, Teacher, or Student.")
         if User.query.filter_by(username=username).first():
             return error_response("Username already exists", 409)
 
@@ -70,10 +87,11 @@ def register_routes(app: Flask) -> None:
         user = User(
             username=username,
             password_hash=generate_password_hash(password),
-            role=role,
+            role=role.title(),
             full_name=data.get("full_name", username),
             email=email,
             phone=data.get("phone"),
+            profile_picture=data.get("profile_picture"),
         )
         db.session.add(user)
         db.session.commit()
@@ -84,8 +102,8 @@ def register_routes(app: Flask) -> None:
         role = request.args.get("role")
         query = User.query
         if role:
-            query = query.filter_by(role=role.lower())
-        users = query.order_by(User.id.asc()).all()
+            query = query.filter(User.role.ilike(role))
+        users = query.order_by(User.user_id.asc()).all()
         return jsonify([user.to_dict() for user in users])
 
     @app.route("/api/students", methods=["POST"])
@@ -93,19 +111,19 @@ def register_routes(app: Flask) -> None:
         data = request.get_json() or {}
         user_id = data.get("user_id")
         roll_number = data.get("roll_number")
+        face_embeddings = data.get("face_embeddings")
 
-        if not user_id or not roll_number:
-            return error_response("user_id and roll_number are required")
+        if not user_id or not roll_number or face_embeddings is None:
+            return error_response("user_id, roll_number, and face_embeddings are required")
 
         user = User.query.get(user_id)
         if not user:
             return error_response("User not found", 404)
-        if user.role != "student":
-            return error_response("User must have student role")
+        if user.role.lower() != "student":
+            return error_response("User must have Student role")
 
         if Student.query.filter_by(user_id=user_id).first():
             return error_response("Student profile already exists for this user", 409)
-
         if Student.query.filter_by(roll_number=roll_number).first():
             return error_response("Roll number already exists", 409)
 
@@ -113,6 +131,10 @@ def register_routes(app: Flask) -> None:
             user_id=user_id,
             roll_number=roll_number,
             department=data.get("department"),
+            registered_by=data.get("registered_by"),
+            face_embeddings=face_embeddings,
+            face_image_path=data.get("face_image_path"),
+            enrollment_status=data.get("enrollment_status", "Active"),
         )
         db.session.add(student)
         db.session.commit()
@@ -120,7 +142,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/api/students", methods=["GET"])
     def list_students():
-        students = Student.query.order_by(Student.id.asc()).all()
+        students = Student.query.order_by(Student.student_id.asc()).all()
         return jsonify([student.to_dict() for student in students])
 
     @app.route("/api/teachers", methods=["POST"])
@@ -134,8 +156,8 @@ def register_routes(app: Flask) -> None:
         user = User.query.get(user_id)
         if not user:
             return error_response("User not found", 404)
-        if user.role != "teacher":
-            return error_response("User must have teacher role")
+        if user.role.lower() != "teacher":
+            return error_response("User must have Teacher role")
 
         if Teacher.query.filter_by(user_id=user_id).first():
             return error_response("Teacher profile already exists for this user", 409)
@@ -151,95 +173,91 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/api/teachers", methods=["GET"])
     def list_teachers():
-        teachers = Teacher.query.order_by(Teacher.id.asc()).all()
+        teachers = Teacher.query.order_by(Teacher.teacher_id.asc()).all()
         return jsonify([teacher.to_dict() for teacher in teachers])
 
-    @app.route("/api/courses", methods=["POST"])
-    def create_course():
+    @app.route("/api/lectures", methods=["POST"])
+    def create_lecture():
         data = request.get_json() or {}
-        name = data.get("name")
-        course_code = data.get("course_code")
+        lecture_name = data.get("lecture_name")
 
-        if not name or not course_code:
-            return error_response("name and course_code are required")
-
-        if Course.query.filter_by(course_code=course_code).first():
-            return error_response("course_code already exists", 409)
+        if not lecture_name:
+            return error_response("lecture_name is required")
 
         teacher_id = data.get("teacher_id")
         teacher = Teacher.query.get(teacher_id) if teacher_id else None
-        course = Course(
-            name=name,
-            course_code=course_code,
+        lecture = Lecture(
+            lecture_name=lecture_name,
+            course_code=data.get("course_code"),
             department=data.get("department"),
             semester=data.get("semester"),
             year=data.get("year"),
+            schedule=data.get("schedule"),
+            room_number=data.get("room_number"),
+            capacity=data.get("capacity"),
+            credits=data.get("credits"),
             teacher=teacher,
         )
-        db.session.add(course)
+        db.session.add(lecture)
         db.session.commit()
-        return jsonify(course.to_dict()), 201
+        return jsonify(lecture.to_dict()), 201
 
-    @app.route("/api/courses", methods=["GET"])
-    def list_courses():
-        courses = Course.query.order_by(Course.id.asc()).all()
-        return jsonify([course.to_dict() for course in courses])
+    @app.route("/api/lectures", methods=["GET"])
+    def list_lectures():
+        lectures = Lecture.query.order_by(Lecture.lecture_id.asc()).all()
+        return jsonify([lecture.to_dict() for lecture in lectures])
 
-    @app.route("/api/courses/<int:course_id>", methods=["GET"])
-    def get_course(course_id: int):
-        course = Course.query.get(course_id)
-        if not course:
-            return error_response("Course not found", 404)
+    @app.route("/api/lectures/<int:lecture_id>", methods=["GET"])
+    def get_lecture(lecture_id: int):
+        lecture = Lecture.query.get(lecture_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
 
-        payload = course.to_dict()
-        payload["enrollments"] = [enrollment.to_dict() for enrollment in course.enrollments]
+        payload = lecture.to_dict()
+        payload["enrollments"] = [enrollment.to_dict() for enrollment in lecture.enrollments]
         return jsonify(payload)
 
-    @app.route("/api/courses/<int:course_id>/assign-teacher", methods=["POST"])
-    def assign_teacher(course_id: int):
+    @app.route("/api/lectures/<int:lecture_id>/assign-teacher", methods=["POST"])
+    def assign_teacher(lecture_id: int):
         data = request.get_json() or {}
         teacher_id = data.get("teacher_id")
         if not teacher_id:
             return error_response("teacher_id is required")
 
-        course, teacher = get_course_and_teacher(course_id, teacher_id)
-        if not course:
-            return error_response("Course not found", 404)
+        lecture = Lecture.query.get(lecture_id)
+        teacher = Teacher.query.get(teacher_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
         if not teacher:
             return error_response("Teacher not found", 404)
 
-        course.teacher = teacher
+        lecture.teacher = teacher
         db.session.commit()
-        return jsonify(course.to_dict())
+        return jsonify(lecture.to_dict())
 
-    @app.route("/api/courses/<int:course_id>/enroll", methods=["POST"])
-    def enroll_student(course_id: int):
+    @app.route("/api/lectures/<int:lecture_id>/enroll", methods=["POST"])
+    def enroll_user(lecture_id: int):
         data = request.get_json() or {}
-        student_id = data.get("student_id")
         user_id = data.get("user_id")
+        is_teacher = bool(data.get("is_teacher", False))
 
-        if not student_id or not user_id:
-            return error_response("student_id and user_id are required")
+        if not user_id:
+            return error_response("user_id is required")
 
-        course = Course.query.get(course_id)
-        if not course:
-            return error_response("Course not found", 404)
+        lecture, user = get_lecture_and_user(lecture_id, user_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
+        if not user:
+            return error_response("User not found", 404)
 
-        student = Student.query.get(student_id)
-        if not student:
-            return error_response("Student not found", 404)
+        if UserLecture.query.filter_by(user_id=user_id, lecture_id=lecture_id).first():
+            return error_response("User already enrolled in this lecture", 409)
 
-        if student.user_id != user_id:
-            return error_response("student_id must belong to user_id")
-
-        if Enrollment.query.filter_by(student_id=student_id, course_id=course_id).first():
-            return error_response("Student already enrolled in this course", 409)
-
-        enrollment = Enrollment(
+        enrollment = UserLecture(
             user_id=user_id,
-            student_id=student_id,
-            course_id=course_id,
-            is_teacher=False,
+            lecture_id=lecture_id,
+            is_teacher=is_teacher,
+            enrollment_status=data.get("enrollment_status", "Active"),
         )
         db.session.add(enrollment)
         db.session.commit()
@@ -247,12 +265,12 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/api/enrollments", methods=["GET"])
     def list_enrollments():
-        enrollments = Enrollment.query.order_by(Enrollment.id.asc()).all()
+        enrollments = UserLecture.query.order_by(UserLecture.lecture_id.asc(), UserLecture.user_id.asc()).all()
         result = []
         for enrollment in enrollments:
             record = enrollment.to_dict()
-            record["course"] = enrollment.course.to_dict() if enrollment.course else None
-            record["student"] = enrollment.student.to_dict() if enrollment.student else None
+            record["lecture"] = enrollment.lecture.to_dict() if enrollment.lecture else None
+            record["user"] = enrollment.user.to_dict() if enrollment.user else None
             result.append(record)
         return jsonify(result)
 
