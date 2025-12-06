@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -18,6 +18,7 @@ import {
   MailOpen,
   Mail,
 } from "lucide-react";
+import { fetchNotifications, NotificationItem } from "../lib/api";
 
 interface Notification {
   id: string;
@@ -36,213 +37,54 @@ interface NotificationsPanelProps {
 
 export function NotificationsPanel({ onBack, userRole }: NotificationsPanelProps) {
   const [activeTab, setActiveTab] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Admin notifications
-  const adminNotifications: Notification[] = [
-    {
-      id: "1",
-      type: "error",
-      title: "System Error Detected",
-      message: "Face recognition service failed to start on Camera 03. Immediate attention required.",
-      timestamp: "5 minutes ago",
-      read: false,
-      category: "system",
-    },
-    {
-      id: "2",
-      type: "warning",
-      title: "Camera Connection Issue",
-      message: "Camera 04 (Hallway) is experiencing intermittent connectivity. Check network connection.",
-      timestamp: "15 minutes ago",
-      read: false,
-      category: "camera",
-    },
-    {
-      id: "3",
-      type: "warning",
-      title: "Storage Warning",
-      message: "Database storage is at 85% capacity. Consider archiving old records or expanding storage.",
-      timestamp: "1 hour ago",
-      read: true,
-      category: "storage",
-    },
-    {
-      id: "4",
-      type: "error",
-      title: "Camera Offline",
-      message: "Camera 02 (Classroom A) went offline at 9:45 AM. No attendance data being captured.",
-      timestamp: "2 hours ago",
-      read: true,
-      category: "camera",
-    },
-    {
-      id: "5",
-      type: "warning",
-      title: "High System Load",
-      message: "Recognition processing experiencing delays due to high CPU usage (92%).",
-      timestamp: "3 hours ago",
-      read: true,
-      category: "system",
-    },
-    {
-      id: "6",
-      type: "info",
-      title: "Backup Completed",
-      message: "Daily system backup completed successfully. All data secured.",
-      timestamp: "Yesterday",
-      read: true,
-      category: "storage",
-    },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const payload = await fetchNotifications();
+        const mapped: Notification[] = payload.map((item: NotificationItem) => ({
+          id: item.id,
+          type:
+            item.severity === "high"
+              ? "error"
+              : item.severity === "medium"
+              ? "warning"
+              : "info",
+          title: item.title,
+          message: item.message,
+          timestamp: item.timestamp,
+          read: false,
+          category: item.type || "general",
+        }));
+        setNotifications(mapped);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load notifications";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Teacher notifications
-  const teacherNotifications: Notification[] = [
-    {
-      id: "1",
-      type: "warning",
-      title: "Low Attendance Alert",
-      message: "Computer Science 10A has only 65% attendance today. 8 students are absent.",
-      timestamp: "30 minutes ago",
-      read: false,
-      category: "attendance",
-    },
-    {
-      id: "2",
-      type: "info",
-      title: "Daily Attendance Summary",
-      message: "Your classes today: CS 10A (28/32 present), CS 10B (30/30 present).",
-      timestamp: "2 hours ago",
-      read: false,
-      category: "summary",
-    },
-    {
-      id: "3",
-      type: "info",
-      title: "Student Correction Request",
-      message: "John Smith requested attendance correction for Jan 15, 2024. Review pending.",
-      timestamp: "3 hours ago",
-      read: true,
-      category: "attendance",
-    },
-    {
-      id: "4",
-      type: "success",
-      title: "Weekly Report Ready",
-      message: "Your weekly attendance report for Jan 8-12 is ready for download.",
-      timestamp: "Yesterday",
-      read: true,
-      category: "summary",
-    },
-    {
-      id: "5",
-      type: "warning",
-      title: "Repeated Absences",
-      message: "Sarah Johnson has been absent for 3 consecutive days. Consider follow-up.",
-      timestamp: "Yesterday",
-      read: true,
-      category: "attendance",
-    },
-  ];
+    load();
+  }, []);
 
-  // Student notifications
-  const studentNotifications: Notification[] = [
-    {
-      id: "1",
-      type: "success",
-      title: "Correction Request Approved",
-      message: "Your attendance correction request for Jan 15, 2024 has been approved by your teacher.",
-      timestamp: "1 hour ago",
-      read: false,
-      category: "correction",
-    },
-    {
-      id: "2",
-      type: "info",
-      title: "Attendance Update",
-      message: "You were marked present for Computer Science at 9:15 AM today.",
-      timestamp: "2 hours ago",
-      read: false,
-      category: "attendance",
-    },
-    {
-      id: "3",
-      type: "warning",
-      title: "Low Attendance Warning",
-      message: "Your attendance has dropped to 88%. Maintain 90% to meet requirements.",
-      timestamp: "Yesterday",
-      read: true,
-      category: "attendance",
-    },
-    {
-      id: "4",
-      type: "error",
-      title: "Correction Request Denied",
-      message: "Your correction request for Jan 10, 2024 was denied. Reason: Insufficient documentation.",
-      timestamp: "2 days ago",
-      read: true,
-      category: "correction",
-    },
-    {
-      id: "5",
-      type: "info",
-      title: "Monthly Report Available",
-      message: "Your attendance report for December is now available for download.",
-      timestamp: "3 days ago",
-      read: true,
-      category: "attendance",
-    },
-  ];
+  const roleFiltered = useMemo(() => {
+    return notifications.filter((item) => {
+      if (userRole === "admin") return true;
+      if (userRole === "teacher") {
+        return item.category !== "system" && item.category !== "storage";
+      }
+      return item.category !== "system" && item.category !== "report";
+    });
+  }, [notifications, userRole]);
 
-  const notifications =
-    userRole === "admin"
-      ? adminNotifications
-      : userRole === "teacher"
-      ? teacherNotifications
-      : studentNotifications;
-
-  const [notificationList, setNotificationList] = useState(notifications);
-
+  const notificationList = roleFiltered;
   const unreadCount = notificationList.filter((n) => !n.read).length;
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "error":
-        return <XCircle className="w-5 h-5 text-red-500" />;
-      case "warning":
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
-      case "success":
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-      default:
-        return <Bell className="w-5 h-5 text-blue-500" />;
-    }
-  };
-
-  const getNotificationColor = (type: string) => {
-    switch (type) {
-      case "error":
-        return "bg-red-50 border-red-200 hover:bg-red-100";
-      case "warning":
-        return "bg-yellow-50 border-yellow-200 hover:bg-yellow-100";
-      case "success":
-        return "bg-green-50 border-green-200 hover:bg-green-100";
-      default:
-        return "bg-blue-50 border-blue-200 hover:bg-blue-100";
-    }
-  };
-
-  const handleMarkAsRead = (id: string) => {
-    setNotificationList(
-      notificationList.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
-
-  const handleMarkAllAsRead = () => {
-    setNotificationList(notificationList.map((n) => ({ ...n, read: true })));
-  };
-
-  const handleDelete = (id: string) => {
-    setNotificationList(notificationList.filter((n) => n.id !== id));
-  };
 
   const filteredNotifications =
     activeTab === "all"
@@ -250,6 +92,46 @@ export function NotificationsPanel({ onBack, userRole }: NotificationsPanelProps
       : activeTab === "unread"
       ? notificationList.filter((n) => !n.read)
       : notificationList.filter((n) => n.category === activeTab);
+
+  const handleMarkAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const handleMarkAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const handleDelete = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const getNotificationIcon = (type: Notification["type"]) => {
+    switch (type) {
+      case "error":
+        return <XCircle className="w-6 h-6 text-red-500" />;
+      case "warning":
+        return <AlertTriangle className="w-6 h-6 text-yellow-500" />;
+      case "success":
+        return <CheckCircle2 className="w-6 h-6 text-green-500" />;
+      default:
+        return <Bell className="w-6 h-6 text-blue-500" />;
+    }
+  };
+
+  const getNotificationColor = (type: Notification["type"]) => {
+    switch (type) {
+      case "error":
+        return "bg-red-50 border-red-200";
+      case "warning":
+        return "bg-yellow-50 border-yellow-200";
+      case "success":
+        return "bg-green-50 border-green-200";
+      default:
+        return "bg-blue-50 border-blue-200";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -281,6 +163,12 @@ export function NotificationsPanel({ onBack, userRole }: NotificationsPanelProps
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-6 py-8">
+        {error && (
+          <Card className="p-4 mb-4 border-red-200 bg-red-50 text-red-700">{error}</Card>
+        )}
+        {loading && (
+          <Card className="p-4 mb-4 border-blue-200 bg-blue-50 text-blue-700">Loading notifications...</Card>
+        )}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="all">
