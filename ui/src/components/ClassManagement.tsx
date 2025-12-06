@@ -281,7 +281,19 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const handleOpenStudents = async (cls: Class) => {
     setStudentModalClass(cls);
     setSelectedStudentId("");
-    await loadClassStudents(Number(cls.id));
+    setStudentModalError(null);
+    setAttendanceSummary(null);
+    setClassStudents([]);
+    setAvailableStudents([]);
+    setStudentModalLoading(true);
+    try {
+      await loadClassStudents(Number(cls.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load class details";
+      setStudentModalError(message);
+    } finally {
+      setStudentModalLoading(false);
+    }
   };
 
   const handleAddStudentToClass = async () => {
