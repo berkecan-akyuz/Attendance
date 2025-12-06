@@ -25,8 +25,18 @@ class User(db.Model):
     last_login = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
 
-    student = db.relationship("Student", back_populates="user", uselist=False)
-    teacher = db.relationship("Teacher", back_populates="user", uselist=False)
+    student = db.relationship(
+        "Student",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="Student.user_id",
+    )
+    teacher = db.relationship(
+        "Teacher",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="Teacher.user_id",
+    )
     enrollments = db.relationship("UserLecture", back_populates="user")
 
     def to_dict(self):
