@@ -25,6 +25,7 @@ import {
   Play,
   Pause,
 } from "lucide-react";
+import { fetchCameras, CameraResponse } from "../lib/api";
 
 interface RecognizedPerson {
   id: string;
@@ -47,7 +48,7 @@ interface LiveMonitoringProps {
 }
 
 export function LiveMonitoring({ onBack, userRole }: LiveMonitoringProps) {
-  const [selectedCamera, setSelectedCamera] = useState("cam-001");
+  const [selectedCamera, setSelectedCamera] = useState<string | undefined>();
   const [recognitionActive, setRecognitionActive] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [detectedFaces, setDetectedFaces] = useState(3);
@@ -61,13 +62,30 @@ export function LiveMonitoring({ onBack, userRole }: LiveMonitoringProps) {
 
   const logsContainerRef = useRef<HTMLDivElement>(null);
 
-  // Mock cameras
-  const cameras = [
-    { id: "cam-001", name: "Main Entrance - Camera 01" },
-    { id: "cam-002", name: "Classroom A - Camera 02" },
-    { id: "cam-003", name: "Classroom B - Camera 03" },
-    { id: "cam-004", name: "Hallway - Camera 04" },
-  ];
+  const [cameras, setCameras] = useState<CameraResponse[]>([]);
+  const [loadingCameras, setLoadingCameras] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoadingCameras(true);
+      setCameraError(null);
+      try {
+        const payload = await fetchCameras();
+        setCameras(payload);
+        if (payload.length > 0) {
+          setSelectedCamera(String(payload[0].camera_id));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load cameras";
+        setCameraError(message);
+      } finally {
+        setLoadingCameras(false);
+      }
+    };
+
+    load();
+  }, []);
 
   // Mock student names
   const studentNames = [
@@ -192,10 +210,10 @@ export function LiveMonitoring({ onBack, userRole }: LiveMonitoringProps) {
               </SelectTrigger>
               <SelectContent>
                 {cameras.map((cam) => (
-                  <SelectItem key={cam.id} value={cam.id}>
+                  <SelectItem key={cam.camera_id} value={String(cam.camera_id)}>
                     <div className="flex items-center space-x-2">
                       <Camera className="w-4 h-4" />
-                      <span>{cam.name}</span>
+                      <span>{cam.camera_name}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -215,6 +233,15 @@ export function LiveMonitoring({ onBack, userRole }: LiveMonitoringProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="max-w-[1800px] mx-auto px-6 py-4 space-y-2">
+        {cameraError && (
+          <Card className="p-4 border-red-200 bg-red-50 text-red-700">{cameraError}</Card>
+        )}
+        {loadingCameras && (
+          <Card className="p-4 border-blue-100 bg-blue-50 text-blue-700">Loading cameras...</Card>
+        )}
       </div>
 
       {/* Main Content */}

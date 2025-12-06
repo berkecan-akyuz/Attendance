@@ -22,6 +22,8 @@ interface User {
   photo: string;
   status: boolean;
   lastLogin: string;
+  password?: string;
+  phone?: string;
 }
 
 interface AddEditUserModalProps {
@@ -34,12 +36,13 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
-    role: user?.role || "student",
+    role: user?.role || "teacher",
     department: user?.department || "",
     password: "",
     confirmPassword: "",
     photo: user?.photo || "",
     status: user?.status !== undefined ? user.status : true,
+    phone: user?.phone || "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -110,6 +113,8 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
         department: formData.role === "teacher" ? formData.department : undefined,
         photo: formData.photo,
         status: formData.status,
+        password: formData.password,
+        phone: formData.phone,
       });
     }
   };
@@ -208,9 +213,22 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="teacher">Teacher</SelectItem>
-                  <SelectItem value="student">Student</SelectItem>
+                  {user?.role === "student" && (
+                    <SelectItem value="student">Student</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                placeholder="+1 (555) 000-0000"
+              />
             </div>
 
             {/* Department (conditional) */}
