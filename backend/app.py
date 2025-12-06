@@ -6,6 +6,7 @@ from urllib.parse import quote_plus
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import or_, text
+from sqlalchemy.exc import DBAPIError, OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .models import Lecture, Student, Teacher, User, UserLecture, db
@@ -48,10 +49,15 @@ def create_app() -> Flask:
     database_url = os.getenv("DATABASE_URL") or build_mssql_uri()
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    }
 
     db.init_app(app)
     CORS(app)
 
+    register_error_handlers(app)
     register_routes(app)
     return app
 
@@ -63,6 +69,23 @@ def validate_role(role: str) -> Tuple[bool, str]:
 
 def error_response(message: str, status: int = 400):
     return jsonify({"error": message}), status
+
+
+def register_error_handlers(app: Flask) -> None:
+    @app.errorhandler(OperationalError)
+    @app.errorhandler(DBAPIError)
+    def handle_database_error(error):
+        app.logger.error("Database error: %s", error)
+        details = str(error.orig) if getattr(error, "orig", None) else str(error)
+        return (
+            jsonify(
+                {
+                    "error": "Database unavailable. Verify SQL Server host/port/credentials.",
+                    "details": details,
+                }
+            ),
+            503,
+        )
 
 
 def get_lecture_and_user(lecture_id: int, user_id: int) -> Tuple[Lecture, User]:
