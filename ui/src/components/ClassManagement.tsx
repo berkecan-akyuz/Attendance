@@ -97,6 +97,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const [classes, setClasses] = useState<Class[]>([]);
   const [teachers, setTeachers] = useState<UserResponse[]>([]);
   const [cameras, setCameras] = useState<CameraResponse[]>([]);
+  const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [studentModalClass, setStudentModalClass] = useState<Class | null>(null);
   const [classStudents, setClassStudents] = useState<ClassStudent[]>([]);
   const [availableStudents, setAvailableStudents] = useState<ClassStudent[]>([]);
@@ -281,23 +282,28 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     }
   };
 
-  const handleOpenStudents = async (cls: Class) => {
+  const handleOpenStudents = (cls: Class) => {
     setStudentModalClass(cls);
     setSelectedStudentId("");
     setStudentModalError(null);
     setAttendanceSummary(null);
     setClassStudents([]);
     setAvailableStudents([]);
-    setStudentModalLoading(true);
-    try {
-      await loadClassStudents(Number(cls.id));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to load class details";
-      setStudentModalError(message);
-    } finally {
-      setStudentModalLoading(false);
-    }
+    setStudentModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!studentModalOpen || !studentModalClass) return;
+    const lectureId = Number(studentModalClass.id);
+    setStudentModalLoading(true);
+    setStudentModalError(null);
+    loadClassStudents(lectureId)
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Unable to load class details";
+        setStudentModalError(message);
+      })
+      .finally(() => setStudentModalLoading(false));
+  }, [studentModalOpen, studentModalClass?.id]);
 
   const handleAddStudentToClass = async () => {
     if (!studentModalClass || !selectedStudentId) return;
@@ -701,7 +707,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
         />
       )}
 
-      {studentModalClass && (
+      {studentModalOpen && studentModalClass && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
           <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 bg-white relative">
             <div className="flex items-center justify-between mb-4">
@@ -713,6 +719,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                 variant="ghost"
                 onClick={() => {
                   setStudentModalClass(null);
+                  setStudentModalOpen(false);
                   setStudentModalError(null);
                 }}
               >
