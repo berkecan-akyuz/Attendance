@@ -21,8 +21,8 @@ def build_mssql_uri() -> str:
     database = os.getenv("SQLSERVER_DATABASE", "ATTENDANCE")
     driver = os.getenv("SQLSERVER_DRIVER", "ODBC Driver 18 for SQL Server")
     return (
-        f"mssql+pyodbc://{user}:{password}@{host}:{port}/{database}"
-        f"?driver={driver.replace(' ', '+')}&TrustServerCertificate=yes"
+        f"mssql+pyodbc://@{host}:{port}/{database}"
+        f"?driver={driver.replace(' ', '+')}&trusted_connection=yes&TrustServerCertificate=yes"
     )
 
 
