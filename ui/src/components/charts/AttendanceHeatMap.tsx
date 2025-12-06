@@ -1,26 +1,32 @@
 interface AttendanceHeatMapProps {
   compact?: boolean;
+  data?: Array<{ date: string; attendance: number }>;
 }
 
-export function AttendanceHeatMap({ compact = false }: AttendanceHeatMapProps) {
-  // Generate mock data for the last 35 days (5 weeks)
+export function AttendanceHeatMap({ compact = false, data = [] }: AttendanceHeatMapProps) {
   const generateHeatMapData = () => {
-    const data = [];
+    if (data.length) {
+      return data.map((item, index) => ({
+        week: Math.floor(index / 7),
+        day: index % 7,
+        attendance: item.attendance,
+      }));
+    }
+    const fallback = [] as { week: number; day: number; attendance: number }[];
     const weeks = 5;
     const daysPerWeek = 7;
-    
+
     for (let week = 0; week < weeks; week++) {
       for (let day = 0; day < daysPerWeek; day++) {
-        // Random attendance percentage between 70-100%
         const attendance = Math.floor(Math.random() * 30) + 70;
-        data.push({
+        fallback.push({
           week,
           day,
           attendance,
         });
       }
     }
-    return data;
+    return fallback;
   };
 
   const heatMapData = generateHeatMapData();
