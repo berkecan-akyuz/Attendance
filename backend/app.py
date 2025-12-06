@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Tuple
 from urllib.parse import quote_plus
 
@@ -81,7 +81,13 @@ def register_routes(app: Flask) -> None:
         except Exception:
             db.session.rollback()
             db_ok = False
-        return jsonify({"status": "ok", "database": db_ok, "timestamp": datetime.utcnow().isoformat()})
+        return jsonify(
+            {
+                "status": "ok",
+                "database": db_ok,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     @app.route("/api/users", methods=["POST"])
     def create_user():
@@ -133,7 +139,7 @@ def register_routes(app: Flask) -> None:
         if not user.is_active:
             return error_response("Account is disabled", 403)
 
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.session.commit()
 
         payload = user.to_dict()

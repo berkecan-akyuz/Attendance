@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import UniqueConstraint
@@ -21,7 +21,7 @@ class User(db.Model):
     email = db.Column(db.String(150), unique=True)
     phone = db.Column(db.String(20))
     profile_picture = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
 
@@ -59,7 +59,7 @@ class Student(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("User.user_id"), unique=True, nullable=False)
     roll_number = db.Column(db.String(50), unique=True, nullable=False)
     department = db.Column(db.String(100))
-    registration_date = db.Column(db.DateTime, default=datetime.utcnow)
+    registration_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     registered_by = db.Column(db.Integer, db.ForeignKey("User.user_id"))
     face_embeddings = db.Column(db.Text, nullable=False)
     face_image_path = db.Column(db.String(255))
@@ -67,7 +67,13 @@ class Student(db.Model):
 
     user = db.relationship("User", foreign_keys=[user_id], back_populates="student")
     registered_by_user = db.relationship("User", foreign_keys=[registered_by])
-    enrollments = db.relationship("UserLecture", back_populates="student")
+    enrollments = db.relationship(
+        "UserLecture",
+        primaryjoin="UserLecture.user_id==Student.user_id",
+        foreign_keys="UserLecture.user_id",
+        back_populates="student",
+        viewonly=True,
+    )
     faces = db.relationship("FaceDataset", back_populates="student")
 
     def to_dict(self):
@@ -94,7 +100,7 @@ class Teacher(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("User.user_id"), unique=True, nullable=False)
     department = db.Column(db.String(100))
     specialization = db.Column(db.String(200))
-    date_joined = db.Column(db.DateTime, default=datetime.utcnow)
+    date_joined = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = db.relationship("User", back_populates="teacher")
     lectures = db.relationship("Lecture", back_populates="teacher")
@@ -125,7 +131,7 @@ class Lecture(db.Model):
     room_number = db.Column(db.String(50))
     capacity = db.Column(db.Integer)
     credits = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     teacher = db.relationship("Teacher", back_populates="lectures")
     enrollments = db.relationship("UserLecture", back_populates="lecture")
@@ -155,7 +161,7 @@ class UserLecture(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("User.user_id"), primary_key=True)
     lecture_id = db.Column(db.Integer, db.ForeignKey("Lecture.lecture_id"), primary_key=True)
     is_teacher = db.Column(db.Boolean, default=False)
-    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    enrolled_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     enrollment_status = db.Column(db.String(20), default="Active")
 
     user = db.relationship("User", back_populates="enrollments")
@@ -164,6 +170,7 @@ class UserLecture(db.Model):
         "Student",
         primaryjoin="UserLecture.user_id==Student.user_id",
         foreign_keys=[user_id],
+        back_populates="enrollments",
         viewonly=True,
     )
 
@@ -184,7 +191,7 @@ class FaceDataset(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey("Student.student_id"), nullable=False)
     image_path = db.Column(db.String(255), nullable=False)
     capture_device = db.Column(db.String(100))
-    capture_date = db.Column(db.DateTime, default=datetime.utcnow)
+    capture_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     quality_score = db.Column(db.Float)
 
     student = db.relationship("Student", back_populates="faces")
