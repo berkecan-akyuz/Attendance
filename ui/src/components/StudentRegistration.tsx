@@ -16,7 +16,6 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
   const [formData, setFormData] = useState({
     fullName: "",
     rollNumber: "",
-    classSection: "",
     department: "",
     email: "",
     phoneNumber: "",
@@ -79,7 +78,6 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
     const requiredFields = [
       formData.fullName,
       formData.rollNumber,
-      formData.classSection,
       formData.department,
       formData.email,
       formData.password,

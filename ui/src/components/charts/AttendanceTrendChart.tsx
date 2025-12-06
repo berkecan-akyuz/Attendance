@@ -5,17 +5,15 @@ interface AttendanceTrendChartProps {
 }
 
 export function AttendanceTrendChart({ data = [] }: AttendanceTrendChartProps) {
-  const chartData = data.length
-    ? data
-    : [
-        { date: 'Mon', attendance: 92 },
-        { date: 'Tue', attendance: 88 },
-        { date: 'Wed', attendance: 95 },
-        { date: 'Thu', attendance: 90 },
-        { date: 'Fri', attendance: 82 },
-        { date: 'Sat', attendance: 94 },
-        { date: 'Sun', attendance: 89 },
-      ];
+  if (!data.length) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-gray-500 border border-dashed rounded-lg bg-white">
+        No attendance trends available yet
+      </div>
+    );
+  }
+
+  const chartData = data;
   return (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={chartData}>

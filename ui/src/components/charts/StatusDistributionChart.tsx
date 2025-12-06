@@ -11,13 +11,15 @@ const COLORS = {
 };
 
 export function StatusDistributionChart({ data = [] }: StatusDistributionChartProps) {
-  const chartData = data.length
-    ? data
-    : [
-        { name: 'Present', value: 420, percentage: 84 },
-        { name: 'Absent', value: 50, percentage: 10 },
-        { name: 'Late', value: 30, percentage: 6 },
-      ];
+  if (!data.length) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-gray-500 border border-dashed rounded-lg bg-white">
+        No attendance distribution to show
+      </div>
+    );
+  }
+
+  const chartData = data;
   return (
     <ResponsiveContainer width="100%" height={300}>
       <PieChart>
@@ -31,7 +33,7 @@ export function StatusDistributionChart({ data = [] }: StatusDistributionChartPr
           fill="#8884d8"
           dataKey="value"
         >
-          {data.map((entry, index) => (
+          {chartData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[entry.name as keyof typeof COLORS]} />
           ))}
         </Pie>

@@ -93,6 +93,46 @@ export function NotificationsPanel({ onBack, userRole }: NotificationsPanelProps
       ? notificationList.filter((n) => !n.read)
       : notificationList.filter((n) => n.category === activeTab);
 
+  const handleMarkAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const handleMarkAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const handleDelete = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const getNotificationIcon = (type: Notification["type"]) => {
+    switch (type) {
+      case "error":
+        return <XCircle className="w-6 h-6 text-red-500" />;
+      case "warning":
+        return <AlertTriangle className="w-6 h-6 text-yellow-500" />;
+      case "success":
+        return <CheckCircle2 className="w-6 h-6 text-green-500" />;
+      default:
+        return <Bell className="w-6 h-6 text-blue-500" />;
+    }
+  };
+
+  const getNotificationColor = (type: Notification["type"]) => {
+    switch (type) {
+      case "error":
+        return "bg-red-50 border-red-200";
+      case "warning":
+        return "bg-yellow-50 border-yellow-200";
+      case "success":
+        return "bg-green-50 border-green-200";
+      default:
+        return "bg-blue-50 border-blue-200";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}

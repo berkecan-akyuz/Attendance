@@ -34,8 +34,12 @@ import {
   assignLectureTeacher,
   CameraResponse,
   createLecture,
+  enrollStudentInLecture,
   fetchCameras,
+  fetchLectureAttendanceSummary,
+  fetchLectureStudents,
   fetchLectureSummaries,
+  fetchStudents,
   fetchUsers,
   LectureSummary,
   UserResponse,
@@ -67,6 +71,15 @@ interface Class {
   year: string;
 }
 
+interface ClassStudent {
+  user_id: number;
+  student_id: number;
+  full_name?: string;
+  email?: string;
+  roll_number?: string;
+  enrollment_status?: string;
+}
+
 interface ClassManagementProps {
   onBack: () => void;
   userRole: "admin" | "teacher";
@@ -84,6 +97,16 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const [classes, setClasses] = useState<Class[]>([]);
   const [teachers, setTeachers] = useState<UserResponse[]>([]);
   const [cameras, setCameras] = useState<CameraResponse[]>([]);
+  const [studentModalClass, setStudentModalClass] = useState<Class | null>(null);
+  const [classStudents, setClassStudents] = useState<ClassStudent[]>([]);
+  const [availableStudents, setAvailableStudents] = useState<ClassStudent[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<
+    | { present: number; absent: number; late: number; unknown: number; total_records: number }
+    | null
+  >(null);
+  const [studentModalLoading, setStudentModalLoading] = useState(false);
+  const [studentModalError, setStudentModalError] = useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
 
   const getSemesterLabel = (value: string | number | null | undefined) => {
     const map: Record<string, string> = {
@@ -211,6 +234,70 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const handleEditClass = (cls: Class) => {
     setEditingClass(cls);
     setModalOpen(true);
+  };
+
+  const loadClassStudents = async (lectureId: number) => {
+    setStudentModalLoading(true);
+    setStudentModalError(null);
+    try {
+      const [enrolled, allStudents, summary] = await Promise.all([
+        fetchLectureStudents(lectureId),
+        fetchStudents(),
+        fetchLectureAttendanceSummary(lectureId),
+      ]);
+
+      const mappedEnrolled: ClassStudent[] = enrolled.map((record: any) => ({
+        user_id: record.user_id,
+        student_id: record.student_id,
+        full_name: record.full_name,
+        email: record.email,
+        roll_number: record.roll_number,
+        enrollment_status: record.enrollment_status,
+      }));
+
+      const mappedAvailable: ClassStudent[] = (allStudents || []).map((record: any) => {
+        const user = record.user || {};
+        return {
+          user_id: record.user_id || user.user_id,
+          student_id: record.student_id,
+          full_name: user.full_name || user.username,
+          email: user.email,
+          roll_number: record.roll_number,
+        };
+      });
+
+      const enrolledUserIds = new Set(mappedEnrolled.map((s) => s.user_id));
+      setAvailableStudents(mappedAvailable.filter((s) => !enrolledUserIds.has(s.user_id)));
+      setClassStudents(mappedEnrolled);
+      setAttendanceSummary(summary);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load class students";
+      setStudentModalError(message);
+    } finally {
+      setStudentModalLoading(false);
+    }
+  };
+
+  const handleOpenStudents = async (cls: Class) => {
+    setStudentModalClass(cls);
+    setSelectedStudentId("");
+    await loadClassStudents(Number(cls.id));
+  };
+
+  const handleAddStudentToClass = async () => {
+    if (!studentModalClass || !selectedStudentId) return;
+    setStudentModalLoading(true);
+    setStudentModalError(null);
+    try {
+      await enrollStudentInLecture(Number(studentModalClass.id), Number(selectedStudentId));
+      await loadClassStudents(Number(studentModalClass.id));
+      setSelectedStudentId("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to add student";
+      setStudentModalError(message);
+    } finally {
+      setStudentModalLoading(false);
+    }
   };
 
   const refreshClasses = async () => {
@@ -550,20 +637,20 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                         Edit
                       </Button>
                     )}
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="flex-1"
-                      onClick={() => alert(`Viewing students for ${cls.name}`)}
+                      onClick={() => handleOpenStudents(cls)}
                     >
                       <Users className="w-4 h-4 mr-1" />
                       Students
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="flex-1"
-                      onClick={() => alert(`Viewing attendance for ${cls.name}`)}
+                      onClick={() => handleOpenStudents(cls)}
                     >
                       <ClipboardList className="w-4 h-4 mr-1" />
                       Attendance
@@ -597,6 +684,114 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
             location: c.location,
           }))}
         />
+      )}
+
+      {studentModalClass && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 bg-white relative">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-gray-900">{studentModalClass.name}</h3>
+                <p className="text-gray-500">Manage students and attendance</p>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setStudentModalClass(null);
+                  setStudentModalError(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+
+            {studentModalError && (
+              <Card className="p-3 mb-3 border-red-200 bg-red-50 text-red-700">{studentModalError}</Card>
+            )}
+
+            {attendanceSummary && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {["present", "absent", "late", "unknown"].map((key) => {
+                  const value = (attendanceSummary as any)[key] || 0;
+                  const labels: Record<string, string> = {
+                    present: "Present",
+                    absent: "Absent",
+                    late: "Late",
+                    unknown: "Unknown",
+                  };
+                  return (
+                    <Card key={key} className="p-4 text-center">
+                      <p className="text-gray-500">{labels[key]}</p>
+                      <p className="text-gray-900 text-xl font-semibold">{value}</p>
+                    </Card>
+                  );
+                })}
+                <Card className="p-4 text-center">
+                  <p className="text-gray-500">Total Records</p>
+                  <p className="text-gray-900 text-xl font-semibold">
+                    {attendanceSummary.total_records || 0}
+                  </p>
+                </Card>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-gray-900">Enrolled Students</h4>
+                  {studentModalLoading && <span className="text-sm text-gray-500">Refreshing...</span>}
+                </div>
+                <Card className="divide-y">
+                  {classStudents.length === 0 ? (
+                    <div className="p-4 text-gray-500">No students enrolled yet.</div>
+                  ) : (
+                    classStudents.map((student) => (
+                      <div key={student.student_id} className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-gray-900">{student.full_name || "Unnamed"}</p>
+                          <p className="text-gray-500 text-sm">{student.email}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Roll: {student.roll_number || "N/A"}</p>
+                          <p className="text-xs text-gray-500">Status: {student.enrollment_status || "Active"}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </Card>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-gray-900">Add Student to Class</h4>
+                <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a student" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableStudents.length === 0 ? (
+                      <SelectItem value="" disabled>
+                        No available students
+                      </SelectItem>
+                    ) : (
+                      availableStudents.map((student) => (
+                        <SelectItem key={student.user_id} value={String(student.user_id)}>
+                          {student.full_name || student.email || "Student"}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  onClick={handleAddStudentToClass}
+                  disabled={!selectedStudentId || studentModalLoading}
+                >
+                  Add Student
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );
