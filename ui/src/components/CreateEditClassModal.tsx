@@ -65,7 +65,7 @@ export function CreateEditClassModal({
     name: classData?.name || "",
     department: classData?.department || "",
     teacherId: classData?.teacher?.id ? String(classData.teacher.id) : "none",
-    semester: classData?.semester || "Fall",
+    semester: classData?.semester || "3",
     year: classData?.year || "2024",
     days: classData?.schedule.days || [],
     startTime: classData?.schedule.startTime || "09:00",
@@ -87,6 +87,13 @@ export function CreateEditClassModal({
   ];
 
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  const semesterOptions = [
+    { value: "1", label: "Spring" },
+    { value: "2", label: "Summer" },
+    { value: "3", label: "Fall" },
+    { value: "4", label: "Winter" },
+  ];
 
   const handleInputChange = (field: string, value: any) => {
     setFormData({ ...formData, [field]: value });
@@ -318,9 +325,11 @@ export function CreateEditClassModal({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Fall">Fall</SelectItem>
-                    <SelectItem value="Spring">Spring</SelectItem>
-                    <SelectItem value="Summer">Summer</SelectItem>
+                    {semesterOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

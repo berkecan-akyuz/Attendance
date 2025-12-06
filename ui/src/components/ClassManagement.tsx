@@ -63,6 +63,7 @@ interface Class {
   room: string;
   camera: string;
   semester: string;
+  semesterLabel: string;
   year: string;
 }
 
@@ -84,6 +85,17 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const [teachers, setTeachers] = useState<UserResponse[]>([]);
   const [cameras, setCameras] = useState<CameraResponse[]>([]);
 
+  const getSemesterLabel = (value: string | number | null | undefined) => {
+    const map: Record<string, string> = {
+      "1": "Spring",
+      "2": "Summer",
+      "3": "Fall",
+      "4": "Winter",
+    };
+    const key = value !== null && value !== undefined ? String(value) : "";
+    return map[key] || key;
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -95,34 +107,38 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
           fetchCameras(),
         ]);
 
-        const mapped: Class[] = summaries.map((lecture) => ({
-          id: String(lecture.lecture_id),
-          code: lecture.course_code || `L-${lecture.lecture_id}`,
-          name: lecture.lecture_name,
-          department: lecture.department || "Unassigned",
-          teacher: lecture.teacher
-            ? {
-                id: lecture.teacher.teacher_id
-                  ? String(lecture.teacher.teacher_id)
-                  : lecture.teacher.full_name || "",
-                name: lecture.teacher.full_name || "Unassigned",
-                photo: "",
-              }
-            : null,
-          enrollment: {
-            current: lecture.enrolled,
-            max: lecture.capacity || lecture.enrolled || 0,
-          },
-          schedule: {
-            days: lecture.schedule ? lecture.schedule.split(",").map((d) => d.trim()) : [],
-            startTime: "",
-            endTime: "",
-          },
-          room: lecture.room_number || "TBD",
-          camera: lecture.camera?.camera_name || lecture.camera?.lecture_name || "Unassigned",
-          semester: lecture.semester ? String(lecture.semester) : "",
-          year: lecture.year ? String(lecture.year) : "",
-        }));
+        const mapped: Class[] = summaries.map((lecture) => {
+          const semesterValue = lecture.semester != null ? String(lecture.semester) : "";
+          return {
+            id: String(lecture.lecture_id),
+            code: lecture.course_code || `L-${lecture.lecture_id}`,
+            name: lecture.lecture_name,
+            department: lecture.department || "Unassigned",
+            teacher: lecture.teacher
+              ? {
+                  id: lecture.teacher.teacher_id
+                    ? String(lecture.teacher.teacher_id)
+                    : lecture.teacher.full_name || "",
+                  name: lecture.teacher.full_name || "Unassigned",
+                  photo: "",
+                }
+              : null,
+            enrollment: {
+              current: lecture.enrolled,
+              max: lecture.capacity || lecture.enrolled || 0,
+            },
+            schedule: {
+              days: lecture.schedule ? lecture.schedule.split(",").map((d) => d.trim()) : [],
+              startTime: "",
+              endTime: "",
+            },
+            room: lecture.room_number || "TBD",
+            camera: lecture.camera?.camera_name || lecture.camera?.lecture_name || "Unassigned",
+            semester: semesterValue,
+            semesterLabel: getSemesterLabel(semesterValue),
+            year: lecture.year ? String(lecture.year) : "",
+          };
+        });
 
         setClasses(mapped);
         setTeachers(teacherList);
@@ -148,7 +164,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
 
   const stats = {
     totalClasses: displayClasses.length,
-    activeSemester: displayClasses.filter((c) => c.semester === "Fall").length,
+    activeSemester: displayClasses.filter((c) => c.semesterLabel === "Fall").length,
     avgClassSize: displayClasses.length
       ? Math.round(totalEnrollment / displayClasses.length)
       : 0,
@@ -157,7 +173,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
 
   const departments = Array.from(new Set(displayClasses.map((c) => c.department)));
   const semesters = Array.from(
-    new Set(displayClasses.map((c) => `${c.semester} ${c.year}`))
+    new Set(displayClasses.map((c) => `${c.semesterLabel} ${c.year}`))
   );
 
   const getDepartmentColor = (dept: string) => {
@@ -182,7 +198,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
 
     const matchesSemester =
       semesterFilter === "all" ||
-      `${cls.semester} ${cls.year}` === semesterFilter;
+      `${cls.semesterLabel} ${cls.year}` === semesterFilter;
 
     return matchesSearch && matchesDept && matchesSemester;
   });
@@ -201,34 +217,38 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     const summaries: LectureSummary[] = await fetchLectureSummaries(
       userRole === "teacher" && teacherUserId ? { teacherUserId } : undefined
     );
-    const mapped: Class[] = summaries.map((lecture) => ({
-      id: String(lecture.lecture_id),
-      code: lecture.course_code || `L-${lecture.lecture_id}`,
-      name: lecture.lecture_name,
-      department: lecture.department || "Unassigned",
-      teacher: lecture.teacher
-        ? {
-            id: lecture.teacher.teacher_id
-              ? String(lecture.teacher.teacher_id)
-              : lecture.teacher.full_name || "",
-            name: lecture.teacher.full_name || "Unassigned",
-            photo: "",
-          }
-        : null,
-      enrollment: {
-        current: lecture.enrolled,
-        max: lecture.capacity || lecture.enrolled || 0,
-      },
-      schedule: {
-        days: lecture.schedule ? lecture.schedule.split(",").map((d) => d.trim()) : [],
-        startTime: "",
-        endTime: "",
-      },
-      room: lecture.room_number || "TBD",
-      camera: lecture.camera?.camera_name || lecture.camera?.lecture_name || "Unassigned",
-      semester: lecture.semester ? String(lecture.semester) : "",
-      year: lecture.year ? String(lecture.year) : "",
-    }));
+    const mapped: Class[] = summaries.map((lecture) => {
+      const semesterValue = lecture.semester != null ? String(lecture.semester) : "";
+      return {
+        id: String(lecture.lecture_id),
+        code: lecture.course_code || `L-${lecture.lecture_id}`,
+        name: lecture.lecture_name,
+        department: lecture.department || "Unassigned",
+        teacher: lecture.teacher
+          ? {
+              id: lecture.teacher.teacher_id
+                ? String(lecture.teacher.teacher_id)
+                : lecture.teacher.full_name || "",
+              name: lecture.teacher.full_name || "Unassigned",
+              photo: "",
+            }
+          : null,
+        enrollment: {
+          current: lecture.enrolled,
+          max: lecture.capacity || lecture.enrolled || 0,
+        },
+        schedule: {
+          days: lecture.schedule ? lecture.schedule.split(",").map((d) => d.trim()) : [],
+          startTime: "",
+          endTime: "",
+        },
+        room: lecture.room_number || "TBD",
+        camera: lecture.camera?.camera_name || lecture.camera?.lecture_name || "Unassigned",
+        semester: semesterValue,
+        semesterLabel: getSemesterLabel(semesterValue),
+        year: lecture.year ? String(lecture.year) : "",
+      };
+    });
     setClasses(mapped);
   };
 
@@ -237,6 +257,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     try {
       let lectureId: number | null = editingClass ? Number(editingClass.id) : null;
       if (!editingClass) {
+        const semesterValue = classData.semester ? Number(classData.semester) : undefined;
         const created = await createLecture({
           lecture_name: classData.name,
           course_code: classData.code,
@@ -244,8 +265,8 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
           teacher_id: classData.teacherId || undefined,
           room_number: classData.room,
           schedule: classData.schedule?.days?.join(", "),
-          semester: classData.semester,
-          year: classData.year,
+          semester: semesterValue,
+          year: classData.year ? Number(classData.year) : undefined,
           capacity: classData.enrollment?.max,
         });
         lectureId = created.lecture_id;

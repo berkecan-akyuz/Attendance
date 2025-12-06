@@ -108,6 +108,59 @@ def get_teacher_by_user_id(user_id: int) -> Teacher | None:
     return Teacher.query.filter_by(user_id=user_id).first()
 
 
+def coerce_semester(value):
+    """Normalize semester to an integer for SQL Server storage.
+
+    Accepts integer-like strings ("1"), seasonal labels ("Fall"/"Spring"/"Summer"/"Winter"),
+    or None. Returns None if the value cannot be parsed.
+    """
+
+    if value is None:
+        return None
+
+    term_map = {
+        "spring": 1,
+        "summer": 2,
+        "fall": 3,
+        "autumn": 3,
+        "winter": 4,
+    }
+
+    if isinstance(value, str):
+        trimmed = value.strip()
+        if not trimmed:
+            return None
+        lowered = trimmed.lower()
+        if lowered in term_map:
+            return term_map[lowered]
+        try:
+            return int(trimmed)
+        except ValueError:
+            return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def coerce_int(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped)
+        except ValueError:
+            return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def register_routes(app: Flask) -> None:
     @app.route("/api/health", methods=["GET"])
     def health_check():
@@ -619,18 +672,18 @@ def register_routes(app: Flask) -> None:
         if not lecture_name:
             return error_response("lecture_name is required")
 
-        teacher_id = data.get("teacher_id")
+        teacher_id = coerce_int(data.get("teacher_id"))
         teacher = Teacher.query.get(teacher_id) if teacher_id else None
         lecture = Lecture(
             lecture_name=lecture_name,
             course_code=data.get("course_code"),
             department=data.get("department"),
-            semester=data.get("semester"),
-            year=data.get("year"),
+            semester=coerce_semester(data.get("semester")),
+            year=coerce_int(data.get("year")),
             schedule=data.get("schedule"),
             room_number=data.get("room_number"),
-            capacity=data.get("capacity"),
-            credits=data.get("credits"),
+            capacity=coerce_int(data.get("capacity")),
+            credits=coerce_int(data.get("credits")),
             teacher=teacher,
         )
         db.session.add(lecture)
@@ -705,7 +758,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/lectures/<int:lecture_id>/assign-teacher", methods=["POST"])
     def assign_teacher(lecture_id: int):
         data = request.get_json() or {}
-        teacher_id = data.get("teacher_id")
+        teacher_id = coerce_int(data.get("teacher_id"))
         if not teacher_id:
             return error_response("teacher_id is required")
 
@@ -727,7 +780,7 @@ def register_routes(app: Flask) -> None:
             return error_response("Lecture not found", 404)
 
         data = request.get_json() or {}
-        camera_id = data.get("camera_id")
+        camera_id = coerce_int(data.get("camera_id"))
         if not camera_id:
             return error_response("camera_id is required")
 
