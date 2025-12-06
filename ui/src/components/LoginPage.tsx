@@ -12,19 +12,23 @@ import { cn } from "./ui/utils";
 
 interface LoginPageProps {
   onLogin: (payload: AuthPayload) => void;
+  onForgotPassword?: () => void;
 }
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState("student");
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!email || !password || !role) {
+      setError("Email, password, and role are required");
+      return;
+    }
     setError(null);
     setIsLoading(true);
 
@@ -130,16 +134,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   Remember Me
                 </Label>
               </div>
-              <a
-                href="#"
+              <button
+                type="button"
                 className="text-blue-600 hover:text-blue-700 transition-colors"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log("Forgot password clicked");
-                }}
+                onClick={() => onForgotPassword?.()}
               >
                 Forgot Password?
-              </a>
+              </button>
             </div>
 
             {/* Login Button */}

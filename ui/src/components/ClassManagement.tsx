@@ -29,7 +29,17 @@ import {
   Eye,
   ClipboardList,
 } from "lucide-react";
-import { fetchLectureSummaries, LectureSummary } from "../lib/api";
+import {
+  assignLectureCamera,
+  assignLectureTeacher,
+  CameraResponse,
+  createLecture,
+  fetchCameras,
+  fetchLectureSummaries,
+  fetchUsers,
+  LectureSummary,
+  UserResponse,
+} from "../lib/api";
 
 interface Class {
   id: string;
@@ -71,15 +81,19 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const [modalOpen, setModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
+  const [teachers, setTeachers] = useState<UserResponse[]>([]);
+  const [cameras, setCameras] = useState<CameraResponse[]>([]);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const summaries: LectureSummary[] = await fetchLectureSummaries(
-          userRole === "teacher" && teacherUserId ? { teacherUserId } : undefined
-        );
+        const [summaries, teacherList, cameraList] = await Promise.all([
+          fetchLectureSummaries(userRole === "teacher" && teacherUserId ? { teacherUserId } : undefined),
+          fetchUsers("teacher"),
+          fetchCameras(),
+        ]);
 
         const mapped: Class[] = summaries.map((lecture) => ({
           id: String(lecture.lecture_id),
@@ -111,6 +125,8 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
         }));
 
         setClasses(mapped);
+        setTeachers(teacherList);
+        setCameras(cameraList);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unable to load classes";
         setError(message);
@@ -181,29 +197,78 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     setModalOpen(true);
   };
 
-  const handleSaveClass = (classData: Partial<Class>) => {
-    if (editingClass) {
-      setClasses(
-        classes.map((c) => (c.id === editingClass.id ? { ...c, ...classData } : c))
-      );
-    } else {
-      const newClass: Class = {
-        id: String(classes.length + 1),
-        code: classData.code || "",
-        name: classData.name || "",
-        department: classData.department || "",
-        teacher: classData.teacher || null,
-        enrollment: classData.enrollment || { current: 0, max: 30 },
-        schedule: classData.schedule || { days: [], startTime: "", endTime: "" },
-        room: classData.room || "",
-        camera: classData.camera || "",
-        semester: classData.semester || "",
-        year: classData.year || "",
-      };
-      setClasses([...classes, newClass]);
+  const refreshClasses = async () => {
+    const summaries: LectureSummary[] = await fetchLectureSummaries(
+      userRole === "teacher" && teacherUserId ? { teacherUserId } : undefined
+    );
+    const mapped: Class[] = summaries.map((lecture) => ({
+      id: String(lecture.lecture_id),
+      code: lecture.course_code || `L-${lecture.lecture_id}`,
+      name: lecture.lecture_name,
+      department: lecture.department || "Unassigned",
+      teacher: lecture.teacher
+        ? {
+            id: lecture.teacher.teacher_id
+              ? String(lecture.teacher.teacher_id)
+              : lecture.teacher.full_name || "",
+            name: lecture.teacher.full_name || "Unassigned",
+            photo: "",
+          }
+        : null,
+      enrollment: {
+        current: lecture.enrolled,
+        max: lecture.capacity || lecture.enrolled || 0,
+      },
+      schedule: {
+        days: lecture.schedule ? lecture.schedule.split(",").map((d) => d.trim()) : [],
+        startTime: "",
+        endTime: "",
+      },
+      room: lecture.room_number || "TBD",
+      camera: lecture.camera?.camera_name || lecture.camera?.lecture_name || "Unassigned",
+      semester: lecture.semester ? String(lecture.semester) : "",
+      year: lecture.year ? String(lecture.year) : "",
+    }));
+    setClasses(mapped);
+  };
+
+  const handleSaveClass = async (classData: Partial<Class> & { teacherId?: number | null; cameraId?: number | null }) => {
+    setLoading(true);
+    try {
+      let lectureId: number | null = editingClass ? Number(editingClass.id) : null;
+      if (!editingClass) {
+        const created = await createLecture({
+          lecture_name: classData.name,
+          course_code: classData.code,
+          department: classData.department,
+          teacher_id: classData.teacherId || undefined,
+          room_number: classData.room,
+          schedule: classData.schedule?.days?.join(", "),
+          semester: classData.semester,
+          year: classData.year,
+          capacity: classData.enrollment?.max,
+        });
+        lectureId = created.lecture_id;
+      } else {
+        lectureId = Number(editingClass.id);
+        if (classData.teacherId) {
+          await assignLectureTeacher(lectureId, classData.teacherId);
+        }
+      }
+
+      if (lectureId && classData.cameraId) {
+        await assignLectureCamera(lectureId, classData.cameraId);
+      }
+
+      await refreshClasses();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to save class";
+      setError(message);
+    } finally {
+      setLoading(false);
+      setModalOpen(false);
+      setEditingClass(null);
     }
-    setModalOpen(false);
-    setEditingClass(null);
   };
 
   const getEnrollmentPercentage = (current: number, max: number) => {
@@ -499,6 +564,17 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
             setModalOpen(false);
             setEditingClass(null);
           }}
+          teachers={teachers.map((t) => ({
+            id: t.teacher_id || t.user_id,
+            name: t.full_name || t.username,
+            department: (t as any).department,
+            email: t.email,
+          }))}
+          cameras={cameras.map((c) => ({
+            id: c.camera_id,
+            name: c.camera_name,
+            location: c.location,
+          }))}
         />
       )}
     </div>

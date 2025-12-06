@@ -49,6 +49,8 @@ class User(db.Model):
             "phone": self.phone,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "student_id": self.student.student_id if self.student else None,
+            "teacher_id": self.teacher.teacher_id if self.teacher else None,
         }
 
 

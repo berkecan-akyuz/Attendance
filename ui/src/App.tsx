@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LoginPage } from "./components/LoginPage";
+import { ForgotPassword } from "./components/ForgotPassword";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { StudentRegistration } from "./components/StudentRegistration";
 import { TeacherAttendance } from "./components/TeacherAttendance";
@@ -12,7 +13,19 @@ import { NotificationsPanel } from "./components/NotificationsPanel";
 import { AuthPayload } from "./lib/api";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"login" | "dashboard" | "register" | "attendance" | "cameras" | "reports" | "student" | "settings" | "live" | "notifications">("login");
+  const [currentPage, setCurrentPage] = useState<
+    | "login"
+    | "forgot"
+    | "dashboard"
+    | "register"
+    | "attendance"
+    | "cameras"
+    | "reports"
+    | "student"
+    | "settings"
+    | "live"
+    | "notifications"
+  >("login");
   const [userRole, setUserRole] = useState<string>("");
   const [auth, setAuth] = useState<AuthPayload | null>(null);
 
@@ -35,6 +48,8 @@ export default function App() {
     setAuth(null);
     setCurrentPage("login");
   };
+
+  const handleNavigateToForgot = () => setCurrentPage("forgot");
 
   const handleNavigateToRegister = () => {
     setCurrentPage("register");
@@ -72,7 +87,12 @@ export default function App() {
 
   return (
     <>
-      {currentPage === "login" && <LoginPage onLogin={handleLogin} />}
+      {currentPage === "login" && (
+        <LoginPage onLogin={handleLogin} onForgotPassword={handleNavigateToForgot} />
+      )}
+      {currentPage === "forgot" && (
+        <ForgotPassword onBack={() => setCurrentPage("login")} />
+      )}
       {currentPage === "dashboard" && userRole === "admin" && (
         <AdminDashboard
           onLogout={handleLogout}

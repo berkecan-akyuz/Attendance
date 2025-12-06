@@ -184,6 +184,19 @@ def register_routes(app: Flask) -> None:
         payload["last_login"] = user.last_login.isoformat() if user.last_login else None
         return jsonify(payload)
 
+    @app.route("/api/forgot-password", methods=["POST"])
+    def forgot_password():
+        data = request.get_json() or {}
+        email = (data.get("email") or "").strip()
+        if not email:
+            return error_response("Email is required")
+
+        user = User.query.filter(func.lower(User.email) == email.lower()).first()
+        if not user:
+            return error_response("Account not found", 404)
+
+        return jsonify({"message": "Password reset instructions sent", "user_id": user.user_id})
+
     @app.route("/api/users", methods=["GET"])
     def list_users():
         role = request.args.get("role")
@@ -639,6 +652,56 @@ def register_routes(app: Flask) -> None:
         payload["enrollments"] = [enrollment.to_dict() for enrollment in lecture.enrollments]
         return jsonify(payload)
 
+    @app.route("/api/notifications", methods=["GET"])
+    def list_notifications():
+        notifications = []
+
+        offline_cameras = Camera.query.filter(Camera.status.ilike("offline")).all()
+        for camera in offline_cameras:
+            notifications.append(
+                {
+                    "id": f"camera-{camera.camera_id}",
+                    "type": "camera",
+                    "title": "Camera offline",
+                    "message": f"{camera.camera_name} at {camera.location} is offline",
+                    "severity": "high",
+                    "timestamp": (camera.last_checked.isoformat() if camera.last_checked else datetime.now(timezone.utc).isoformat()),
+                }
+            )
+
+        unassigned = Lecture.query.filter(Lecture.teacher_id.is_(None)).count()
+        if unassigned:
+            notifications.append(
+                {
+                    "id": "lectures-unassigned",
+                    "type": "lectures",
+                    "title": "Unassigned classes",
+                    "message": f"{unassigned} lecture(s) do not have a teacher assigned",
+                    "severity": "medium",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
+        recent_sessions = (
+            AttendanceSession.query.order_by(AttendanceSession.session_date.desc())
+            .limit(5)
+            .all()
+        )
+        for session in recent_sessions:
+            lecture_name = session.lecture.lecture_name if session.lecture else "Lecture"
+            notifications.append(
+                {
+                    "id": f"session-{session.session_id}",
+                    "type": "session",
+                    "title": f"Session {session.status}",
+                    "message": f"{lecture_name} on {session.session_date} is {session.status}",
+                    "severity": "info",
+                    "timestamp": session.created_at.isoformat() if session.created_at else datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
+        return jsonify(notifications)
+
     @app.route("/api/lectures/<int:lecture_id>/assign-teacher", methods=["POST"])
     def assign_teacher(lecture_id: int):
         data = request.get_json() or {}
@@ -656,6 +719,27 @@ def register_routes(app: Flask) -> None:
         lecture.teacher = teacher
         db.session.commit()
         return jsonify(lecture.to_dict())
+
+    @app.route("/api/lectures/<int:lecture_id>/assign-camera", methods=["POST"])
+    def assign_camera(lecture_id: int):
+        lecture = Lecture.query.get(lecture_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
+
+        data = request.get_json() or {}
+        camera_id = data.get("camera_id")
+        if not camera_id:
+            return error_response("camera_id is required")
+
+        camera = Camera.query.get(camera_id)
+        if not camera:
+            return error_response("Camera not found", 404)
+
+        camera.assigned_lecture_id = lecture_id
+        db.session.commit()
+        payload = lecture.to_dict()
+        payload["camera"] = camera.to_dict()
+        return jsonify(payload)
 
     @app.route("/api/lectures/<int:lecture_id>/enroll", methods=["POST"])
     def enroll_user(lecture_id: int):
@@ -705,6 +789,54 @@ def register_routes(app: Flask) -> None:
             if camera.lecture:
                 entry["lecture_name"] = camera.lecture.lecture_name
             payload.append(entry)
+        return jsonify(payload)
+
+    @app.route("/api/cameras", methods=["POST"])
+    def create_camera():
+        data = request.get_json() or {}
+        name = data.get("camera_name")
+        location = data.get("location")
+        stream_url = data.get("stream_url")
+
+        if not name or not location or not stream_url:
+            return error_response("camera_name, location, and stream_url are required")
+
+        camera = Camera(
+            camera_name=name,
+            location=location,
+            stream_url=stream_url,
+            assigned_lecture_id=data.get("assigned_lecture_id"),
+            status=data.get("status", "Online"),
+        )
+        db.session.add(camera)
+        db.session.commit()
+        payload = camera.to_dict()
+        if camera.lecture:
+            payload["lecture_name"] = camera.lecture.lecture_name
+        return jsonify(payload), 201
+
+    @app.route("/api/cameras/<int:camera_id>", methods=["PATCH"])
+    def update_camera(camera_id: int):
+        camera = Camera.query.get(camera_id)
+        if not camera:
+            return error_response("Camera not found", 404)
+
+        data = request.get_json() or {}
+        if "camera_name" in data:
+            camera.camera_name = data.get("camera_name") or camera.camera_name
+        if "location" in data:
+            camera.location = data.get("location") or camera.location
+        if "stream_url" in data:
+            camera.stream_url = data.get("stream_url") or camera.stream_url
+        if "status" in data:
+            camera.status = data.get("status") or camera.status
+        if "assigned_lecture_id" in data:
+            camera.assigned_lecture_id = data.get("assigned_lecture_id")
+
+        db.session.commit()
+        payload = camera.to_dict()
+        if camera.lecture:
+            payload["lecture_name"] = camera.lecture.lecture_name
         return jsonify(payload)
 
 

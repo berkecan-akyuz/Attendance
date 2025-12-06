@@ -113,6 +113,29 @@ export interface CameraResponse {
   lecture_name?: string;
 }
 
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  severity: "info" | "medium" | "high" | string;
+  timestamp: string;
+}
+
+export interface LecturePayload {
+  lecture_id: number;
+  lecture_name: string;
+  course_code?: string;
+  department?: string;
+  semester?: number | string;
+  year?: number | string;
+  teacher_id?: number | null;
+  room_number?: string;
+  capacity?: number;
+  schedule?: string;
+  camera?: CameraResponse | null;
+}
+
 export async function loginUser(email: string, password: string, role?: string): Promise<AuthPayload> {
   const response = await fetch(withBase("/api/login"), {
     method: "POST",
@@ -285,6 +308,108 @@ export async function fetchCameras(): Promise<CameraResponse[]> {
     throw new Error(message);
   }
   return payload as CameraResponse[];
+}
+
+export async function createCamera(input: {
+  camera_name: string;
+  location: string;
+  stream_url: string;
+  status?: string;
+  assigned_lecture_id?: number | null;
+}): Promise<CameraResponse> {
+  const response = await fetch(withBase("/api/cameras"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to create camera");
+  }
+  return payload as CameraResponse;
+}
+
+export async function updateCamera(cameraId: number, data: Partial<CameraResponse>): Promise<CameraResponse> {
+  const response = await fetch(withBase(`/api/cameras/${cameraId}`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to update camera");
+  }
+  return payload as CameraResponse;
+}
+
+export async function createLecture(data: Partial<LecturePayload>): Promise<LecturePayload> {
+  const response = await fetch(withBase("/api/lectures"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to create class");
+  }
+  return payload as LecturePayload;
+}
+
+export async function assignLectureTeacher(lectureId: number, teacherId: number): Promise<LecturePayload> {
+  const response = await fetch(withBase(`/api/lectures/${lectureId}/assign-teacher`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teacher_id: teacherId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to assign teacher");
+  }
+  return payload as LecturePayload;
+}
+
+export async function assignLectureCamera(lectureId: number, cameraId: number): Promise<LecturePayload> {
+  const response = await fetch(withBase(`/api/lectures/${lectureId}/assign-camera`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ camera_id: cameraId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to assign camera");
+  }
+  return payload as LecturePayload;
+}
+
+export async function fetchLectures(): Promise<LecturePayload[]> {
+  const response = await fetch(withBase("/api/lectures"));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error((payload && (payload.error as string)) || "Unable to load lectures");
+  }
+  return payload as LecturePayload[];
+}
+
+export async function fetchNotifications(): Promise<NotificationItem[]> {
+  const response = await fetch(withBase("/api/notifications"));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error((payload && (payload.error as string)) || "Unable to load notifications");
+  }
+  return payload as NotificationItem[];
+}
+
+export async function requestPasswordReset(email: string): Promise<{ message: string; user_id?: number }> {
+  const response = await fetch(withBase("/api/forgot-password"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to submit reset request");
+  }
+  return payload as { message: string; user_id?: number };
 }
 
 export const API_BASE_URL = normalizedBase || "(proxy)";
