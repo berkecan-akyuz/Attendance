@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -30,6 +30,7 @@ import {
 } from "./ui/select";
 import { EditAttendanceModal } from "./EditAttendanceModal";
 import { ClassManagement } from "./ClassManagement";
+import { fetchTeacherStats, fetchTeacherStudents } from "../lib/api";
 import {
   ScanFace,
   Users,
@@ -55,14 +56,13 @@ interface AttendanceRecord {
   id: string;
   rollNumber: string;
   studentName: string;
-  photo: string;
-  status: "present" | "absent" | "late";
-  timeIn: string;
-  verificationMethod: "auto" | "manual";
-  notes?: string;
+  lecture: string;
+  status: string;
+  email?: string;
 }
 
 interface TeacherAttendanceProps {
+  userId?: number | null;
   onBack: () => void;
   onLogout: () => void;
   onNavigateToReports: () => void;
@@ -70,7 +70,7 @@ interface TeacherAttendanceProps {
   onNavigateToNotifications: () => void;
 }
 
-export function TeacherAttendance({ onBack, onLogout, onNavigateToReports, onNavigateToLive, onNavigateToNotifications }: TeacherAttendanceProps) {
+export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReports, onNavigateToLive, onNavigateToNotifications }: TeacherAttendanceProps) {
   const [currentPage, setCurrentPage] = useState("attendance");
   const [selectedClass, setSelectedClass] = useState("CS 10A");
   const [dateFrom, setDateFrom] = useState("");
@@ -79,77 +79,53 @@ export function TeacherAttendance({ onBack, onLogout, onNavigateToReports, onNav
   const [editingStudent, setEditingStudent] = useState<AttendanceRecord | null>(null);
   const [isLocked, setIsLocked] = useState(false);
 
-  // Mock data
-  const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([
-    {
-      id: "1",
-      rollNumber: "CS-2023-001",
-      studentName: "John Smith",
-      photo:
-        "https://ui-avatars.com/api/?name=John+Smith&size=100&background=4F46E5",
-      status: "present",
-      timeIn: "09:15 AM",
-      verificationMethod: "auto",
-    },
-    {
-      id: "2",
-      rollNumber: "CS-2023-002",
-      studentName: "Sarah Johnson",
-      photo:
-        "https://ui-avatars.com/api/?name=Sarah+Johnson&size=100&background=10B981",
-      status: "present",
-      timeIn: "09:10 AM",
-      verificationMethod: "auto",
-    },
-    {
-      id: "3",
-      rollNumber: "CS-2023-003",
-      studentName: "Mike Davis",
-      photo:
-        "https://ui-avatars.com/api/?name=Mike+Davis&size=100&background=F59E0B",
-      status: "late",
-      timeIn: "09:35 AM",
-      verificationMethod: "auto",
-    },
-    {
-      id: "4",
-      rollNumber: "CS-2023-004",
-      studentName: "Emily Brown",
-      photo:
-        "https://ui-avatars.com/api/?name=Emily+Brown&size=100&background=EC4899",
-      status: "absent",
-      timeIn: "-",
-      verificationMethod: "manual",
-      notes: "Sick leave",
-    },
-    {
-      id: "5",
-      rollNumber: "CS-2023-005",
-      studentName: "David Wilson",
-      photo:
-        "https://ui-avatars.com/api/?name=David+Wilson&size=100&background=8B5CF6",
-      status: "present",
-      timeIn: "09:05 AM",
-      verificationMethod: "auto",
-    },
-    {
-      id: "6",
-      rollNumber: "CS-2023-006",
-      studentName: "Lisa Anderson",
-      photo:
-        "https://ui-avatars.com/api/?name=Lisa+Anderson&size=100&background=06B6D4",
-      status: "late",
-      timeIn: "09:40 AM",
-      verificationMethod: "manual",
-    },
-  ]);
+  const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    presentToday: 0,
+    absentToday: 0,
+    attendanceRate: 0,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const stats = {
-    totalStudents: 32,
-    presentToday: 28,
-    absentToday: 4,
-    attendanceRate: 87.5,
-  };
+  useEffect(() => {
+    const load = async () => {
+      if (!userId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const [teacherSummary, students] = await Promise.all([
+          fetchTeacherStats(userId),
+          fetchTeacherStudents(userId),
+        ]);
+
+        const mapped = students.map((student) => ({
+          id: String(student.student_id),
+          rollNumber: student.roll_number,
+          studentName: student.full_name,
+          lecture: student.lecture,
+          status: student.enrollment_status,
+          email: student.email,
+        }));
+        setAttendanceData(mapped);
+
+        const totalStudents = teacherSummary.students || mapped.length;
+        setStats({
+          totalStudents,
+          presentToday: totalStudents,
+          absentToday: 0,
+          attendanceRate: totalStudents ? 100 : 0,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load teacher data";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [userId]);
 
   const handleExport = () => {
     // Mock export functionality
@@ -189,7 +165,11 @@ export function TeacherAttendance({ onBack, onLogout, onNavigateToReports, onNav
           </Badge>
         );
       default:
-        return null;
+        return (
+          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">
+            {status || "Enrolled"}
+          </Badge>
+        );
     }
   };
 
@@ -484,59 +464,40 @@ export function TeacherAttendance({ onBack, onLogout, onNavigateToReports, onNav
                 <TableRow>
                   <TableHead>Student</TableHead>
                   <TableHead>Roll Number</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Lecture</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>Verification</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attendanceData.map((record) => (
-                  <TableRow key={record.id} className={getRowClassName(record.status)}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={record.photo} />
-                          <AvatarFallback>
-                            {record.studentName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{record.studentName}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-gray-600">{record.rollNumber}</TableCell>
-                    <TableCell>{getStatusBadge(record.status)}</TableCell>
-                    <TableCell className="text-gray-600">{record.timeIn}</TableCell>
-                    <TableCell>
-                      {record.verificationMethod === "auto" ? (
-                        <div className="flex items-center text-blue-600">
-                          <Scan className="w-4 h-4 mr-1" />
-                          <span>Auto</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-gray-600">
-                          <PenSquare className="w-4 h-4 mr-1" />
-                          <span>Manual</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingStudent(record)}
-                          disabled={isLocked}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </div>
+                {attendanceData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                      {loading ? "Loading students..." : "No students assigned yet"}
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  attendanceData.map((record) => (
+                    <TableRow key={record.id} className={getRowClassName(record.status)}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="w-10 h-10">
+                            <AvatarFallback>
+                              {record.studentName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-gray-900">{record.studentName}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-gray-600">{record.rollNumber}</TableCell>
+                      <TableCell className="text-gray-600">{record.email || "-"}</TableCell>
+                      <TableCell className="text-gray-600">{record.lecture}</TableCell>
+                      <TableCell>{getStatusBadge(record.status)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
