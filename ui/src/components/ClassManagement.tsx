@@ -241,12 +241,15 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     setStudentModalError(null);
     try {
       const [enrolled, allStudents, summary] = await Promise.all([
-        fetchLectureStudents(lectureId),
-        fetchStudents(),
+        fetchLectureStudents(lectureId).catch(() => []),
+        fetchStudents().catch(() => []),
         fetchLectureAttendanceSummary(lectureId),
       ]);
 
-      const mappedEnrolled: ClassStudent[] = enrolled.map((record: any) => ({
+      const enrolledList = Array.isArray(enrolled) ? enrolled : [];
+      const allStudentList = Array.isArray(allStudents) ? allStudents : [];
+
+      const mappedEnrolled: ClassStudent[] = enrolledList.map((record: any) => ({
         user_id: record.user_id,
         student_id: record.student_id,
         full_name: record.full_name,
@@ -255,7 +258,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
         enrollment_status: record.enrollment_status,
       }));
 
-      const mappedAvailable: ClassStudent[] = (allStudents || []).map((record: any) => {
+      const mappedAvailable: ClassStudent[] = allStudentList.map((record: any) => {
         const user = record.user || {};
         return {
           user_id: record.user_id || user.user_id,
@@ -269,7 +272,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
       const enrolledUserIds = new Set(mappedEnrolled.map((s) => s.user_id));
       setAvailableStudents(mappedAvailable.filter((s) => !enrolledUserIds.has(s.user_id)));
       setClassStudents(mappedEnrolled);
-      setAttendanceSummary(summary);
+      setAttendanceSummary(summary || null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load class students";
       setStudentModalError(message);
@@ -721,6 +724,12 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
               <Card className="p-3 mb-3 border-red-200 bg-red-50 text-red-700">{studentModalError}</Card>
             )}
 
+            {studentModalLoading && !studentModalError && (
+              <Card className="p-4 mb-4 bg-blue-50 border-blue-100 text-blue-700">
+                Loading class roster and attendance...
+              </Card>
+            )}
+
             {attendanceSummary && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 {["present", "absent", "late", "unknown"].map((key) => {
@@ -758,7 +767,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                     <div className="p-4 text-gray-500">No students enrolled yet.</div>
                   ) : (
                     classStudents.map((student) => (
-                      <div key={student.student_id} className="p-4 flex items-center justify-between">
+                      <div key={student.student_id || student.user_id} className="p-4 flex items-center justify-between">
                         <div>
                           <p className="text-gray-900">{student.full_name || "Unnamed"}</p>
                           <p className="text-gray-500 text-sm">{student.email}</p>
