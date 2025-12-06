@@ -241,7 +241,7 @@ def register_routes(app: Flask) -> None:
         enrollments = (
             db.session.query(UserLecture, Lecture)
             .join(Lecture, Lecture.lecture_id == UserLecture.lecture_id)
-            .filter(UserLecture.user_id == user_id, UserLecture.is_teacher.is_(False))
+            .filter(UserLecture.user_id == user_id, UserLecture.is_teacher == False)
             .all()
         )
 
@@ -341,7 +341,7 @@ def register_routes(app: Flask) -> None:
                     UserLecture.lecture_id,
                     func.count(UserLecture.user_id).label("count"),
                 )
-                .filter(UserLecture.is_teacher.is_(False))
+                .filter(UserLecture.is_teacher == False)
                 .group_by(UserLecture.lecture_id)
                 .all()
             )
@@ -395,7 +395,7 @@ def register_routes(app: Flask) -> None:
         student_count = (
             db.session.query(func.count(func.distinct(UserLecture.user_id)))
             .join(Lecture, UserLecture.lecture_id == Lecture.lecture_id)
-            .filter(Lecture.teacher_id == teacher.teacher_id, UserLecture.is_teacher.is_(False))
+            .filter(Lecture.teacher_id == teacher.teacher_id, UserLecture.is_teacher == False)
             .scalar()
             or 0
         )
@@ -459,10 +459,9 @@ def register_routes(app: Flask) -> None:
             .all()
         )
 
-        recent_sessions = (
+        attendance_counts = (
             db.session.query(
-                AttendanceSession,
-                Lecture.lecture_name,
+                AttendanceSession.session_id.label("session_id"),
                 func.sum(case((StudentAttendance.status.ilike("present"), 1), else_=0)).label(
                     "present"
                 ),
@@ -473,15 +472,30 @@ def register_routes(app: Flask) -> None:
                     "late"
                 ),
             )
-            .join(Lecture, Lecture.lecture_id == AttendanceSession.lecture_id)
             .join(StudentAttendance, StudentAttendance.session_id == AttendanceSession.session_id)
+            .join(Lecture, Lecture.lecture_id == AttendanceSession.lecture_id)
+        )
+        if teacher_id:
+            attendance_counts = attendance_counts.filter(Lecture.teacher_id == teacher_id)
+
+        attendance_counts = attendance_counts.group_by(AttendanceSession.session_id).subquery()
+
+        recent_sessions = (
+            db.session.query(
+                AttendanceSession,
+                Lecture.lecture_name,
+                attendance_counts.c.present,
+                attendance_counts.c.absent,
+                attendance_counts.c.late,
+            )
+            .join(Lecture, Lecture.lecture_id == AttendanceSession.lecture_id)
+            .join(attendance_counts, attendance_counts.c.session_id == AttendanceSession.session_id)
         )
         if teacher_id:
             recent_sessions = recent_sessions.filter(Lecture.teacher_id == teacher_id)
 
         recent_results = (
-            recent_sessions.group_by(AttendanceSession.session_id, Lecture.lecture_name)
-            .order_by(AttendanceSession.session_date.desc())
+            recent_sessions.order_by(AttendanceSession.session_date.desc())
             .limit(10)
             .all()
         )
@@ -534,7 +548,7 @@ def register_routes(app: Flask) -> None:
             db.session.query(Student, UserLecture, Lecture)
             .join(UserLecture, UserLecture.user_id == Student.user_id)
             .join(Lecture, Lecture.lecture_id == UserLecture.lecture_id)
-            .filter(Lecture.teacher_id == teacher.teacher_id, UserLecture.is_teacher.is_(False))
+            .filter(Lecture.teacher_id == teacher.teacher_id, UserLecture.is_teacher == False)
             .all()
         )
 
