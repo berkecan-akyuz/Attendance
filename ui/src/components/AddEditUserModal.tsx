@@ -22,6 +22,7 @@ interface User {
   photo: string;
   status: boolean;
   lastLogin: string;
+  password?: string;
 }
 
 interface AddEditUserModalProps {
@@ -110,6 +111,7 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
         department: formData.role === "teacher" ? formData.department : undefined,
         photo: formData.photo,
         status: formData.status,
+        password: formData.password,
       });
     }
   };

@@ -4,6 +4,7 @@ import { FaceCapture } from "./FaceCapture";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { ArrowLeft } from "lucide-react";
+import { createStudent, createUser } from "../lib/api";
 
 interface StudentRegistrationProps {
   onBack: () => void;
@@ -20,6 +21,8 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
     phoneNumber: "",
     dateOfBirth: "",
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCaptureImage = () => {
     // Simulate capturing an image
@@ -33,11 +36,34 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
     setCapturedImages(capturedImages.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
-    console.log("Saving student data:", { formData, capturedImages });
-    // Show success message and navigate back
-    alert("Student registered successfully!");
-    onBack();
+  const handleSave = async () => {
+    setError(null);
+    setIsSaving(true);
+    try {
+      const user = await createUser({
+        username: formData.email,
+        email: formData.email,
+        password: formData.rollNumber || "tempPass123!",
+        role: "Student",
+        full_name: formData.fullName,
+        phone: formData.phoneNumber,
+      });
+
+      await createStudent({
+        user_id: user.user_id,
+        roll_number: formData.rollNumber,
+        department: formData.department,
+        face_embeddings: JSON.stringify(capturedImages),
+      });
+
+      alert("Student registered successfully!");
+      onBack();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to save student";
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -110,12 +136,13 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!isFormValid()}
+              disabled={!isFormValid() || isSaving}
               className="px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              Save Student
+              {isSaving ? "Saving..." : "Save Student"}
             </Button>
           </div>
+          {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
         </div>
       </div>
     </div>
