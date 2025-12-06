@@ -6,6 +6,9 @@ import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ScanFace, Lock, User } from "lucide-react";
+import { loginUser } from "../lib/api";
+
+import { cn } from "./ui/utils";
 
 interface LoginPageProps {
   onLogin: (role: string) => void;
@@ -16,11 +19,24 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username && password && role) {
-      onLogin(role);
+    if (!username || !password) return;
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const payload = await loginUser(username, password);
+      const normalizedRole = payload.role?.toLowerCase() || role;
+      onLogin(normalizedRole);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Login failed";
+      setError(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -53,7 +69,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <CardContent className="space-y-5">
             {/* Role Selector */}
             <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role">Role (optional)</Label>
               <Select value={role} onValueChange={setRole}>
                 <SelectTrigger id="role" className="w-full">
                   <SelectValue placeholder="Select your role" />
@@ -128,11 +144,21 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </div>
 
             {/* Login Button */}
+            {error && (
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+                {error}
+              </div>
+            )}
+
             <Button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className={cn(
+                "w-full bg-blue-600 hover:bg-blue-700",
+                isLoading && "opacity-80 cursor-not-allowed"
+              )}
+              disabled={isLoading}
             >
-              Login
+              {isLoading ? "Checking credentials..." : "Login"}
             </Button>
           </CardContent>
         </form>
