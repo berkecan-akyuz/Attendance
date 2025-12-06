@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
@@ -29,6 +29,17 @@ import {
   Eye,
   ClipboardList,
 } from "lucide-react";
+import {
+  assignLectureCamera,
+  assignLectureTeacher,
+  CameraResponse,
+  createLecture,
+  fetchCameras,
+  fetchLectureSummaries,
+  fetchUsers,
+  LectureSummary,
+  UserResponse,
+} from "../lib/api";
 
 interface Class {
   id: string;
@@ -58,152 +69,89 @@ interface Class {
 interface ClassManagementProps {
   onBack: () => void;
   userRole: "admin" | "teacher";
-  teacherId?: string;
+  teacherUserId?: number;
 }
 
-export function ClassManagement({ onBack, userRole, teacherId }: ClassManagementProps) {
+export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManagementProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [semesterFilter, setSemesterFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [teachers, setTeachers] = useState<UserResponse[]>([]);
+  const [cameras, setCameras] = useState<CameraResponse[]>([]);
 
-  const [classes, setClasses] = useState<Class[]>([
-    {
-      id: "1",
-      code: "CS101",
-      name: "Introduction to Programming",
-      department: "Computer Science",
-      teacher: {
-        id: "t1",
-        name: "John Teacher",
-        photo: "",
-      },
-      enrollment: { current: 32, max: 40 },
-      schedule: {
-        days: ["Mon", "Wed", "Fri"],
-        startTime: "09:00",
-        endTime: "10:30",
-      },
-      room: "Room 101",
-      camera: "Camera 12",
-      semester: "Fall",
-      year: "2024",
-    },
-    {
-      id: "2",
-      code: "MATH201",
-      name: "Calculus II",
-      department: "Mathematics",
-      teacher: {
-        id: "t2",
-        name: "Sarah Williams",
-        photo: "",
-      },
-      enrollment: { current: 28, max: 35 },
-      schedule: {
-        days: ["Tue", "Thu"],
-        startTime: "14:00",
-        endTime: "16:00",
-      },
-      room: "Room 203",
-      camera: "Camera 08",
-      semester: "Fall",
-      year: "2024",
-    },
-    {
-      id: "3",
-      code: "ENG105",
-      name: "English Literature",
-      department: "English",
-      teacher: {
-        id: "t3",
-        name: "Lisa Anderson",
-        photo: "",
-      },
-      enrollment: { current: 25, max: 30 },
-      schedule: {
-        days: ["Mon", "Wed"],
-        startTime: "11:00",
-        endTime: "12:30",
-      },
-      room: "Room 305",
-      camera: "Camera 15",
-      semester: "Fall",
-      year: "2024",
-    },
-    {
-      id: "4",
-      code: "PHY301",
-      name: "Quantum Physics",
-      department: "Physics",
-      teacher: null,
-      enrollment: { current: 0, max: 25 },
-      schedule: {
-        days: ["Tue", "Thu"],
-        startTime: "10:00",
-        endTime: "11:30",
-      },
-      room: "Room 402",
-      camera: "Camera 20",
-      semester: "Spring",
-      year: "2025",
-    },
-    {
-      id: "5",
-      code: "CS201",
-      name: "Data Structures & Algorithms",
-      department: "Computer Science",
-      teacher: {
-        id: "t1",
-        name: "John Teacher",
-        photo: "",
-      },
-      enrollment: { current: 38, max: 40 },
-      schedule: {
-        days: ["Mon", "Wed", "Fri"],
-        startTime: "13:00",
-        endTime: "14:30",
-      },
-      room: "Room 102",
-      camera: "Camera 13",
-      semester: "Fall",
-      year: "2024",
-    },
-    {
-      id: "6",
-      code: "CHEM101",
-      name: "General Chemistry",
-      department: "Chemistry",
-      teacher: null,
-      enrollment: { current: 0, max: 30 },
-      schedule: {
-        days: ["Tue", "Thu"],
-        startTime: "08:00",
-        endTime: "09:30",
-      },
-      room: "Lab 201",
-      camera: "Camera 25",
-      semester: "Fall",
-      year: "2024",
-    },
-  ]);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [summaries, teacherList, cameraList] = await Promise.all([
+          fetchLectureSummaries(userRole === "teacher" && teacherUserId ? { teacherUserId } : undefined),
+          fetchUsers("teacher"),
+          fetchCameras(),
+        ]);
+
+        const mapped: Class[] = summaries.map((lecture) => ({
+          id: String(lecture.lecture_id),
+          code: lecture.course_code || `L-${lecture.lecture_id}`,
+          name: lecture.lecture_name,
+          department: lecture.department || "Unassigned",
+          teacher: lecture.teacher
+            ? {
+                id: lecture.teacher.teacher_id
+                  ? String(lecture.teacher.teacher_id)
+                  : lecture.teacher.full_name || "",
+                name: lecture.teacher.full_name || "Unassigned",
+                photo: "",
+              }
+            : null,
+          enrollment: {
+            current: lecture.enrolled,
+            max: lecture.capacity || lecture.enrolled || 0,
+          },
+          schedule: {
+            days: lecture.schedule ? lecture.schedule.split(",").map((d) => d.trim()) : [],
+            startTime: "",
+            endTime: "",
+          },
+          room: lecture.room_number || "TBD",
+          camera: lecture.camera?.camera_name || lecture.camera?.lecture_name || "Unassigned",
+          semester: lecture.semester ? String(lecture.semester) : "",
+          year: lecture.year ? String(lecture.year) : "",
+        }));
+
+        setClasses(mapped);
+        setTeachers(teacherList);
+        setCameras(cameraList);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load classes";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [teacherUserId, userRole]);
 
   // Filter classes for teachers - only show their assigned classes
-  const displayClasses =
-    userRole === "teacher"
-      ? classes.filter((c) => c.teacher?.id === teacherId)
-      : classes;
+  const displayClasses = classes;
+
+  const totalEnrollment = displayClasses.reduce(
+    (acc, c) => acc + c.enrollment.current,
+    0
+  );
 
   const stats = {
     totalClasses: displayClasses.length,
-    activeSemester: displayClasses.filter(
-      (c) => c.semester === "Fall" && c.year === "2024"
-    ).length,
-    avgClassSize: Math.round(
-      displayClasses.reduce((acc, c) => acc + c.enrollment.current, 0) /
-        displayClasses.length
-    ),
+    activeSemester: displayClasses.filter((c) => c.semester === "Fall").length,
+    avgClassSize: displayClasses.length
+      ? Math.round(totalEnrollment / displayClasses.length)
+      : 0,
     withoutTeachers: displayClasses.filter((c) => !c.teacher).length,
   };
 
@@ -249,29 +197,78 @@ export function ClassManagement({ onBack, userRole, teacherId }: ClassManagement
     setModalOpen(true);
   };
 
-  const handleSaveClass = (classData: Partial<Class>) => {
-    if (editingClass) {
-      setClasses(
-        classes.map((c) => (c.id === editingClass.id ? { ...c, ...classData } : c))
-      );
-    } else {
-      const newClass: Class = {
-        id: String(classes.length + 1),
-        code: classData.code || "",
-        name: classData.name || "",
-        department: classData.department || "",
-        teacher: classData.teacher || null,
-        enrollment: classData.enrollment || { current: 0, max: 30 },
-        schedule: classData.schedule || { days: [], startTime: "", endTime: "" },
-        room: classData.room || "",
-        camera: classData.camera || "",
-        semester: classData.semester || "",
-        year: classData.year || "",
-      };
-      setClasses([...classes, newClass]);
+  const refreshClasses = async () => {
+    const summaries: LectureSummary[] = await fetchLectureSummaries(
+      userRole === "teacher" && teacherUserId ? { teacherUserId } : undefined
+    );
+    const mapped: Class[] = summaries.map((lecture) => ({
+      id: String(lecture.lecture_id),
+      code: lecture.course_code || `L-${lecture.lecture_id}`,
+      name: lecture.lecture_name,
+      department: lecture.department || "Unassigned",
+      teacher: lecture.teacher
+        ? {
+            id: lecture.teacher.teacher_id
+              ? String(lecture.teacher.teacher_id)
+              : lecture.teacher.full_name || "",
+            name: lecture.teacher.full_name || "Unassigned",
+            photo: "",
+          }
+        : null,
+      enrollment: {
+        current: lecture.enrolled,
+        max: lecture.capacity || lecture.enrolled || 0,
+      },
+      schedule: {
+        days: lecture.schedule ? lecture.schedule.split(",").map((d) => d.trim()) : [],
+        startTime: "",
+        endTime: "",
+      },
+      room: lecture.room_number || "TBD",
+      camera: lecture.camera?.camera_name || lecture.camera?.lecture_name || "Unassigned",
+      semester: lecture.semester ? String(lecture.semester) : "",
+      year: lecture.year ? String(lecture.year) : "",
+    }));
+    setClasses(mapped);
+  };
+
+  const handleSaveClass = async (classData: Partial<Class> & { teacherId?: number | null; cameraId?: number | null }) => {
+    setLoading(true);
+    try {
+      let lectureId: number | null = editingClass ? Number(editingClass.id) : null;
+      if (!editingClass) {
+        const created = await createLecture({
+          lecture_name: classData.name,
+          course_code: classData.code,
+          department: classData.department,
+          teacher_id: classData.teacherId || undefined,
+          room_number: classData.room,
+          schedule: classData.schedule?.days?.join(", "),
+          semester: classData.semester,
+          year: classData.year,
+          capacity: classData.enrollment?.max,
+        });
+        lectureId = created.lecture_id;
+      } else {
+        lectureId = Number(editingClass.id);
+        if (classData.teacherId) {
+          await assignLectureTeacher(lectureId, classData.teacherId);
+        }
+      }
+
+      if (lectureId && classData.cameraId) {
+        await assignLectureCamera(lectureId, classData.cameraId);
+      }
+
+      await refreshClasses();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to save class";
+      setError(message);
+    } finally {
+      setLoading(false);
+      setModalOpen(false);
+      setEditingClass(null);
     }
-    setModalOpen(false);
-    setEditingClass(null);
   };
 
   const getEnrollmentPercentage = (current: number, max: number) => {
@@ -304,6 +301,16 @@ export function ClassManagement({ onBack, userRole, teacherId }: ClassManagement
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        {error && (
+          <Card className="p-4 border-red-200 bg-red-50 text-red-700">
+            {error}
+          </Card>
+        )}
+        {loading && (
+          <Card className="p-4 border-blue-100 bg-blue-50 text-blue-700">
+            Loading classes from the server...
+          </Card>
+        )}
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="p-6">
@@ -557,6 +564,17 @@ export function ClassManagement({ onBack, userRole, teacherId }: ClassManagement
             setModalOpen(false);
             setEditingClass(null);
           }}
+          teachers={teachers.map((t) => ({
+            id: t.teacher_id || t.user_id,
+            name: t.full_name || t.username,
+            department: (t as any).department,
+            email: t.email,
+          }))}
+          cameras={cameras.map((c) => ({
+            id: c.camera_id,
+            name: c.camera_name,
+            location: c.location,
+          }))}
         />
       )}
     </div>
