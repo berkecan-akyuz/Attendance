@@ -72,7 +72,7 @@ interface TeacherAttendanceProps {
 
 export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReports, onNavigateToLive, onNavigateToNotifications }: TeacherAttendanceProps) {
   const [currentPage, setCurrentPage] = useState("attendance");
-  const [selectedClass, setSelectedClass] = useState("CS 10A");
+  const [selectedClass, setSelectedClass] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [quickFilter, setQuickFilter] = useState("today");
@@ -80,6 +80,7 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
   const [isLocked, setIsLocked] = useState(false);
 
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
+  const [classOptions, setClassOptions] = useState<string[]>([]);
   const [stats, setStats] = useState({
     totalStudents: 0,
     presentToday: 0,
@@ -109,6 +110,12 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
           email: student.email,
         }));
         setAttendanceData(mapped);
+
+        const uniqueClasses = Array.from(new Set(mapped.map((m) => m.lecture).filter(Boolean)));
+        setClassOptions(uniqueClasses);
+        if (!selectedClass && uniqueClasses.length) {
+          setSelectedClass(uniqueClasses[0]);
+        }
 
         const totalStudents = teacherSummary.students || mapped.length;
         setStats({
@@ -185,6 +192,10 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
         return "hover:bg-gray-50";
     }
   };
+
+  const filteredData = selectedClass
+    ? attendanceData.filter((record) => record.lecture === selectedClass)
+    : attendanceData;
 
   if (currentPage === "classes") {
     return (
@@ -345,10 +356,11 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cs-10a">Computer Science - 10A</SelectItem>
-                    <SelectItem value="cs-10b">Computer Science - 10B</SelectItem>
-                    <SelectItem value="math-11a">Mathematics - 11A</SelectItem>
-                    <SelectItem value="eng-12a">English - 12A</SelectItem>
+                    {classOptions.map((cls) => (
+                      <SelectItem key={cls} value={cls}>
+                        {cls}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -470,14 +482,14 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attendanceData.length === 0 ? (
+                {filteredData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-6 text-gray-500">
                       {loading ? "Loading students..." : "No students assigned yet"}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  attendanceData.map((record) => (
+                  filteredData.map((record) => (
                     <TableRow key={record.id} className={getRowClassName(record.status)}>
                       <TableCell>
                         <div className="flex items-center space-x-3">

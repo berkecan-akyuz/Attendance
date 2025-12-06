@@ -275,7 +275,9 @@ export function CreateEditClassModal({
                     <SelectItem key={teacher.id} value={String(teacher.id)}>
                       <div className="flex items-center space-x-2">
                         <span>{teacher.name}</span>
-                        <span className="text-gray-500">({teacher.department || ""})</span>
+                        {teacher.department && (
+                          <span className="text-gray-500">{teacher.department}</span>
+                        )}
                       </div>
                     </SelectItem>
                   ))}

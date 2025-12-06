@@ -133,8 +133,69 @@ export function ReportsAnalytics({
     lowestDay: reports?.recent_sessions[0]?.session_date || "Most recent",
   };
 
+  const trendData = useMemo(() => {
+    if (!reports?.recent_sessions) return [] as Array<{ date: string; attendance: number }>;
+    return reports.recent_sessions.map((session) => {
+      const total = session.present + session.absent + session.late;
+      const attendance = total ? Math.round((session.present / total) * 1000) / 10 : 0;
+      return {
+        date: session.session_date || `Session ${session.session_id}`,
+        attendance,
+      };
+    });
+  }, [reports]);
+
+  const statusData = useMemo(() => {
+    const base = reports?.status;
+    if (!base) return [] as Array<{ name: string; value: number; percentage?: number }>;
+    const total = base.present + base.absent + base.late + (base.unknown || 0);
+    const pct = (val: number) => (total ? Math.round((val / total) * 1000) / 10 : 0);
+    return [
+      { name: "Present", value: base.present, percentage: pct(base.present) },
+      { name: "Absent", value: base.absent, percentage: pct(base.absent) },
+      { name: "Late", value: base.late, percentage: pct(base.late) },
+    ];
+  }, [reports]);
+
+  const heatMapData = useMemo(
+    () =>
+      trendData.map((item) => ({
+        date: item.date,
+        attendance: item.attendance,
+      })),
+    [trendData]
+  );
+
+  const comparisonData = useMemo(() => {
+    if (!reports?.classes) return [] as Array<{ class: string; attendance: number }>;
+    return reports.classes.map((cls) => {
+      const total = cls.total || cls.present + cls.absent + cls.late;
+      const attendance = total ? Math.round((cls.present / total) * 1000) / 10 : 0;
+      return { class: cls.lecture_name, attendance };
+    });
+  }, [reports]);
+
   const handleGenerateReport = () => {
-    console.log("Generating report...");
+    if (!reports) return;
+    const rows = [
+      ["Lecture", "Date", "Present", "Absent", "Late", "Status"],
+      ...(reports.recent_sessions || []).map((s) => [
+        s.lecture_name,
+        s.session_date,
+        s.present,
+        s.absent,
+        s.late,
+        s.status,
+      ]),
+    ];
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "attendance-report.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleExport = (format: string) => {
@@ -319,7 +380,7 @@ export function ReportsAnalytics({
               <div>
                 <p className="text-gray-600 mb-1">Average Attendance</p>
                 <p className="text-gray-900 mb-2">{stats.averageAttendance}%</p>
-                <p className="text-green-600">+2.3% from last month</p>
+                <p className="text-gray-500">Based on recent sessions</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-green-600" />
@@ -345,7 +406,7 @@ export function ReportsAnalytics({
               <div>
                 <p className="text-gray-600 mb-1">Most Attended</p>
                 <p className="text-gray-900 mb-2">{stats.mostAttended}</p>
-                <p className="text-green-600">96.5% attendance</p>
+                <p className="text-gray-500">Highest attendance class</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Award className="w-6 h-6 text-purple-600" />
@@ -358,7 +419,7 @@ export function ReportsAnalytics({
               <div>
                 <p className="text-gray-600 mb-1">Lowest Attendance</p>
                 <p className="text-gray-900 mb-2">{stats.lowestDay}</p>
-                <p className="text-red-600">82.1% average</p>
+                <p className="text-gray-500">Most recent low session</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -383,7 +444,7 @@ export function ReportsAnalytics({
                   <CardTitle>Attendance Trend</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <AttendanceTrendChart />
+                  <AttendanceTrendChart data={trendData} />
                 </CardContent>
               </Card>
 
@@ -392,19 +453,19 @@ export function ReportsAnalytics({
                   <CardTitle>Status Distribution</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <StatusDistributionChart />
+                  <StatusDistributionChart data={statusData} />
                 </CardContent>
               </Card>
             </div>
 
             <Card className="p-6">
-              <CardHeader className="p-0 mb-4">
-                <CardTitle>Attendance Calendar Heat Map</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <AttendanceHeatMap />
-              </CardContent>
-            </Card>
+                <CardHeader className="p-0 mb-4">
+                  <CardTitle>Attendance Calendar Heat Map</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                <AttendanceHeatMap data={heatMapData} />
+                </CardContent>
+              </Card>
           </TabsContent>
 
           {/* Detailed Report Tab */}
@@ -480,7 +541,7 @@ export function ReportsAnalytics({
                   <CardTitle>Daily Attendance Trend</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <AttendanceTrendChart />
+                  <AttendanceTrendChart data={trendData} />
                 </CardContent>
               </Card>
 
@@ -489,7 +550,7 @@ export function ReportsAnalytics({
                   <CardTitle>Class Comparison</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ClassComparisonChart userRole={userRole} />
+                  <ClassComparisonChart userRole={userRole} data={comparisonData} />
                 </CardContent>
               </Card>
 
@@ -498,7 +559,7 @@ export function ReportsAnalytics({
                   <CardTitle>Attendance Distribution</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <StatusDistributionChart />
+                  <StatusDistributionChart data={statusData} />
                 </CardContent>
               </Card>
 
@@ -508,7 +569,7 @@ export function ReportsAnalytics({
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="h-64 flex items-center justify-center text-gray-400">
-                    <AttendanceHeatMap compact />
+                    <AttendanceHeatMap compact data={heatMapData} />
                   </div>
                 </CardContent>
               </Card>

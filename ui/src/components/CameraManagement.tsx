@@ -13,7 +13,7 @@ import {
   WifiOff,
   ArrowLeft
 } from "lucide-react";
-import { fetchCameras, CameraResponse } from "../lib/api";
+import { fetchCameras, CameraResponse, createCamera, updateCamera } from "../lib/api";
 
 interface CameraData {
   id: string;
@@ -52,6 +52,7 @@ export function CameraManagement({
   const [cameras, setCameras] = useState<CameraData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -103,14 +104,51 @@ export function CameraManagement({
     }
   };
 
-  const handleSaveCamera = (cameraData: CameraData) => {
-    if (isAddingNew) {
-      setCameras([...cameras, { ...cameraData, id: `CAM-${String(cameras.length + 1).padStart(3, '0')}` }]);
-    } else {
-      setCameras(cameras.map((cam) => (cam.id === cameraData.id ? cameraData : cam)));
+  const handleSaveCamera = async (cameraData: CameraData) => {
+    setSaving(true);
+    try {
+      if (isAddingNew) {
+        const created = await createCamera({
+          camera_name: cameraData.name,
+          location: cameraData.location,
+          stream_url: cameraData.streamUrl,
+          status: cameraData.status,
+          assigned_lecture_id: null,
+        });
+        setCameras([
+          ...cameras,
+          {
+            ...cameraData,
+            id: `CAM-${String(created.camera_id).padStart(3, "0")}`,
+            assignedClass: created.lecture_name || "Unassigned",
+          },
+        ]);
+      } else {
+        const updated = await updateCamera(Number(cameraData.id.replace("CAM-", "")), {
+          camera_name: cameraData.name,
+          location: cameraData.location,
+          stream_url: cameraData.streamUrl,
+          status: cameraData.status,
+        });
+        setCameras(
+          cameras.map((cam) =>
+            cam.id === cameraData.id
+              ? {
+                  ...cameraData,
+                  assignedClass: updated.lecture_name || cameraData.assignedClass,
+                }
+              : cam
+          )
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to save camera";
+      setError(message);
+    } finally {
+      setSaving(false);
+      setEditingCamera(null);
+      setIsAddingNew(false);
     }
-    setEditingCamera(null);
-    setIsAddingNew(false);
   };
 
   const stats = {
@@ -146,9 +184,33 @@ export function CameraManagement({
       )}
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {error && (
-          <Card className="p-4 mb-4 border-red-200 bg-red-50 text-red-700">{error}</Card>
-        )}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingCamera({
+                  id: "CAM-new",
+                  name: "",
+                  location: "",
+                  streamUrl: "",
+                  ipAddress: "",
+                  status: "offline",
+                  lastHeartbeat: "Just now",
+                  assignedClass: "Unassigned",
+                });
+                setIsAddingNew(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Camera
+            </Button>
+            {saving && <span className="text-gray-600 text-sm">Saving...</span>}
+          </div>
+          {error && (
+            <Card className="p-2 border-red-200 bg-red-50 text-red-700">{error}</Card>
+          )}
+        </div>
         {loading && (
           <Card className="p-4 mb-4 border-blue-200 bg-blue-50 text-blue-700">Loading cameras...</Card>
         )}
