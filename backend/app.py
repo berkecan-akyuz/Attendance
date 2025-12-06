@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from sqlalchemy import or_, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.exc import DBAPIError, OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -217,6 +217,75 @@ def register_routes(app: Flask) -> None:
     def list_students():
         students = Student.query.order_by(Student.student_id.asc()).all()
         return jsonify([student.to_dict() for student in students])
+
+    @app.route("/api/stats/overview", methods=["GET"])
+    def overview_stats():
+        totals = {
+            "total_users": db.session.query(func.count(User.user_id)).scalar() or 0,
+            "total_students": db.session.query(func.count(Student.student_id)).scalar() or 0,
+            "total_teachers": db.session.query(func.count(Teacher.teacher_id)).scalar() or 0,
+            "total_lectures": db.session.query(func.count(Lecture.lecture_id)).scalar() or 0,
+            "total_enrollments": db.session.query(func.count(UserLecture.user_id)).scalar() or 0,
+        }
+        return jsonify(totals)
+
+    @app.route("/api/stats/teacher/<int:user_id>", methods=["GET"])
+    def teacher_stats(user_id: int):
+        teacher = Teacher.query.filter_by(user_id=user_id).first()
+        if not teacher:
+            return error_response("Teacher profile not found", 404)
+
+        class_count = (
+            db.session.query(func.count(Lecture.lecture_id))
+            .filter(Lecture.teacher_id == teacher.teacher_id)
+            .scalar()
+            or 0
+        )
+
+        student_count = (
+            db.session.query(func.count(func.distinct(UserLecture.user_id)))
+            .join(Lecture, UserLecture.lecture_id == Lecture.lecture_id)
+            .filter(Lecture.teacher_id == teacher.teacher_id, UserLecture.is_teacher.is_(False))
+            .scalar()
+            or 0
+        )
+
+        return jsonify(
+            {
+                "teacher_id": teacher.teacher_id,
+                "classes": class_count,
+                "students": student_count,
+            }
+        )
+
+    @app.route("/api/teachers/<int:user_id>/students", methods=["GET"])
+    def teacher_students(user_id: int):
+        teacher = Teacher.query.filter_by(user_id=user_id).first()
+        if not teacher:
+            return error_response("Teacher profile not found", 404)
+
+        enrollments = (
+            db.session.query(Student, UserLecture, Lecture)
+            .join(UserLecture, UserLecture.user_id == Student.user_id)
+            .join(Lecture, Lecture.lecture_id == UserLecture.lecture_id)
+            .filter(Lecture.teacher_id == teacher.teacher_id, UserLecture.is_teacher.is_(False))
+            .all()
+        )
+
+        results = []
+        for student, user_lecture, lecture in enrollments:
+            results.append(
+                {
+                    "student_id": student.student_id,
+                    "roll_number": student.roll_number,
+                    "full_name": student.user.full_name if student.user else "",
+                    "email": student.user.email if student.user else None,
+                    "lecture": lecture.lecture_name,
+                    "enrollment_status": user_lecture.enrollment_status,
+                }
+            )
+
+        return jsonify(results)
 
     @app.route("/api/teachers", methods=["POST"])
     def create_teacher():

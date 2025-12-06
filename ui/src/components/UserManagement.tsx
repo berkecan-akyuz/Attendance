@@ -40,6 +40,7 @@ interface User {
   photo: string;
   status: boolean;
   lastLogin: string;
+  phone?: string;
 }
 
 interface UserManagementProps {
@@ -144,15 +145,17 @@ export function UserManagement({ onBack }: UserManagementProps) {
     setError(null);
     if (!editingUser) {
       try {
+        const role = userData.role === "admin" || userData.role === "teacher" ? userData.role : "teacher";
         const created = await createUser({
           username: userData.email || "", // email is used as the username
           email: userData.email || undefined,
           password: userData.password || "TempPass123!",
-          role: (userData.role || "student").toString(),
+          role: role.toString(),
           full_name: userData.name,
+          phone: userData.phone,
         });
 
-        if (userData.role === "teacher") {
+        if (role === "teacher") {
           await createTeacher({
             user_id: created.user_id,
             department: userData.department,
@@ -168,6 +171,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
           photo: userData.photo || "",
           status: created.is_active ?? true,
           lastLogin: created.last_login || "Never",
+          phone: created.phone,
         };
         setUsers([...users, newUser]);
       } catch (err) {

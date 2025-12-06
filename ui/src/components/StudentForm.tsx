@@ -17,6 +17,7 @@ interface StudentFormProps {
     email: string;
     phoneNumber: string;
     dateOfBirth: string;
+    password: string;
   };
   setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
@@ -120,6 +121,21 @@ export function StudentForm({ formData, setFormData }: StudentFormProps) {
             placeholder="student@example.com"
             value={formData.email}
             onChange={(e) => handleChange("email", e.target.value)}
+            required
+          />
+        </div>
+
+        {/* Password */}
+        <div className="space-y-2">
+          <Label htmlFor="password">
+            Password <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter a secure password"
+            value={formData.password}
+            onChange={(e) => handleChange("password", e.target.value)}
             required
           />
         </div>

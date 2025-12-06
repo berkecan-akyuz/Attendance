@@ -6,12 +6,12 @@ import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ScanFace, Lock, User } from "lucide-react";
-import { loginUser } from "../lib/api";
+import { AuthPayload, loginUser } from "../lib/api";
 
 import { cn } from "./ui/utils";
 
 interface LoginPageProps {
-  onLogin: (role: string) => void;
+  onLogin: (payload: AuthPayload) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -30,8 +30,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
     try {
       const payload = await loginUser(email, password, role || undefined);
-      const normalizedRole = payload.role?.toLowerCase() || role;
-      onLogin(normalizedRole);
+      onLogin(payload);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(message);

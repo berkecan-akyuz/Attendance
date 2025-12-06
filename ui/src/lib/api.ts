@@ -25,6 +25,20 @@ export interface UserResponse extends AuthPayload {
   is_active?: boolean;
 }
 
+export interface OverviewStats {
+  total_users: number;
+  total_students: number;
+  total_teachers: number;
+  total_lectures: number;
+  total_enrollments: number;
+}
+
+export interface TeacherStats {
+  teacher_id: number;
+  classes: number;
+  students: number;
+}
+
 export async function loginUser(email: string, password: string, role?: string): Promise<AuthPayload> {
   const response = await fetch(withBase("/api/login"), {
     method: "POST",
@@ -74,6 +88,7 @@ export async function createStudent(input: {
   department?: string;
   face_embeddings: string;
   face_image_path?: string;
+  registered_by?: number;
 }): Promise<any> {
   const response = await fetch(withBase("/api/students"), {
     method: "POST",
@@ -108,6 +123,52 @@ export async function createTeacher(input: {
   }
 
   return payload;
+}
+
+export async function fetchOverviewStats(): Promise<OverviewStats> {
+  const response = await fetch(withBase("/api/stats/overview"));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = (payload && payload.error) || "Unable to load dashboard stats";
+    throw new Error(message);
+  }
+  return payload as OverviewStats;
+}
+
+export async function fetchTeacherStats(userId: number): Promise<TeacherStats> {
+  const response = await fetch(withBase(`/api/stats/teacher/${userId}`));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = (payload && payload.error) || "Unable to load teacher stats";
+    throw new Error(message);
+  }
+  return payload as TeacherStats;
+}
+
+export async function fetchTeacherStudents(userId: number): Promise<
+  Array<{
+    student_id: number;
+    roll_number: string;
+    full_name: string;
+    email?: string;
+    lecture: string;
+    enrollment_status: string;
+  }>
+> {
+  const response = await fetch(withBase(`/api/teachers/${userId}/students`));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load students";
+    throw new Error(message);
+  }
+  return payload as Array<{
+    student_id: number;
+    roll_number: string;
+    full_name: string;
+    email?: string;
+    lecture: string;
+    enrollment_status: string;
+  }>;
 }
 
 export const API_BASE_URL = normalizedBase || "(proxy)";

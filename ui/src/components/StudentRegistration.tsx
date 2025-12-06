@@ -8,9 +8,10 @@ import { createStudent, createUser } from "../lib/api";
 
 interface StudentRegistrationProps {
   onBack: () => void;
+  registeredBy?: number | null;
 }
 
-export function StudentRegistration({ onBack }: StudentRegistrationProps) {
+export function StudentRegistration({ onBack, registeredBy }: StudentRegistrationProps) {
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     fullName: "",
@@ -20,6 +21,7 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
     email: "",
     phoneNumber: "",
     dateOfBirth: "",
+    password: "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
       const user = await createUser({
         username: formData.email,
         email: formData.email,
-        password: formData.rollNumber || "tempPass123!",
+        password: formData.password || formData.rollNumber || "tempPass123!",
         role: "Student",
         full_name: formData.fullName,
         phone: formData.phoneNumber,
@@ -54,6 +56,7 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
         roll_number: formData.rollNumber,
         department: formData.department,
         face_embeddings: JSON.stringify(capturedImages),
+        registered_by: registeredBy || undefined,
       });
 
       alert("Student registered successfully!");
@@ -79,10 +82,11 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
       formData.classSection,
       formData.department,
       formData.email,
+      formData.password,
     ];
     const allFieldsFilled = requiredFields.every((field) => field.trim() !== "");
     const hasEnoughImages = capturedImages.length >= 3;
-    return allFieldsFilled && hasEnoughImages;
+    return allFieldsFilled && hasEnoughImages && formData.password.length >= 6;
   };
 
   return (

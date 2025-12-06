@@ -9,25 +9,30 @@ import { StudentPortal } from "./components/StudentPortal";
 import { SystemSettings } from "./components/SystemSettings";
 import { LiveMonitoring } from "./components/LiveMonitoring";
 import { NotificationsPanel } from "./components/NotificationsPanel";
+import { AuthPayload } from "./lib/api";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<"login" | "dashboard" | "register" | "attendance" | "cameras" | "reports" | "student" | "settings" | "live" | "notifications">("login");
   const [userRole, setUserRole] = useState<string>("");
+  const [auth, setAuth] = useState<AuthPayload | null>(null);
 
-  const handleLogin = (role: string) => {
-    setUserRole(role);
+  const handleLogin = (payload: AuthPayload) => {
+    const normalizedRole = payload.role?.toLowerCase() || "";
+    setUserRole(normalizedRole);
+    setAuth(payload);
     // Route based on role
-    if (role === "admin") {
+    if (normalizedRole === "admin") {
       setCurrentPage("dashboard");
-    } else if (role === "teacher") {
+    } else if (normalizedRole === "teacher") {
       setCurrentPage("attendance");
-    } else if (role === "student") {
+    } else if (normalizedRole === "student") {
       setCurrentPage("student");
     }
   };
 
   const handleLogout = () => {
     setUserRole("");
+    setAuth(null);
     setCurrentPage("login");
   };
 
@@ -82,11 +87,12 @@ export default function App() {
         />
       )}
       {currentPage === "register" && (
-        <StudentRegistration onBack={handleBackToDashboard} />
+        <StudentRegistration onBack={handleBackToDashboard} registeredBy={auth?.user_id} />
       )}
       {currentPage === "attendance" && userRole === "teacher" && (
-        <TeacherAttendance 
-          onBack={handleBackToDashboard} 
+        <TeacherAttendance
+          userId={auth?.user_id}
+          onBack={handleBackToDashboard}
           onLogout={handleLogout}
           onNavigateToReports={handleNavigateToReports}
           onNavigateToLive={handleNavigateToLive}
