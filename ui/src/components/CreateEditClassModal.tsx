@@ -14,10 +14,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { X, Clock } from "lucide-react";
 
 interface Teacher {
-  id: string;
+  id: number;
   name: string;
-  photo: string;
-  department: string;
+  email?: string;
+  department?: string;
 }
 
 interface Class {
@@ -26,9 +26,9 @@ interface Class {
   name: string;
   department: string;
   teacher: {
-    id: string;
+    id: string | number;
     name: string;
-    photo: string;
+    photo?: string;
   } | null;
   enrollment: {
     current: number;
@@ -47,20 +47,24 @@ interface Class {
 
 interface CreateEditClassModalProps {
   classData: Class | null;
-  onSave: (classData: Partial<Class>) => void;
+  onSave: (classData: Partial<Class> & { teacherId?: number | null; cameraId?: number | null }) => void;
   onClose: () => void;
+  teachers: Teacher[];
+  cameras: Array<{ id: number; name: string; location: string }>;
 }
 
 export function CreateEditClassModal({
   classData,
   onSave,
   onClose,
+  teachers,
+  cameras,
 }: CreateEditClassModalProps) {
   const [formData, setFormData] = useState({
     code: classData?.code || "",
     name: classData?.name || "",
     department: classData?.department || "",
-    teacherId: classData?.teacher?.id || "none",
+    teacherId: classData?.teacher?.id ? String(classData.teacher.id) : "none",
     semester: classData?.semester || "Fall",
     year: classData?.year || "2024",
     days: classData?.schedule.days || [],
@@ -72,41 +76,6 @@ export function CreateEditClassModal({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Mock teacher data
-  const teachers: Teacher[] = [
-    {
-      id: "t1",
-      name: "John Teacher",
-      photo: "",
-      department: "Computer Science",
-    },
-    {
-      id: "t2",
-      name: "Sarah Williams",
-      photo: "",
-      department: "Mathematics",
-    },
-    {
-      id: "t3",
-      name: "Lisa Anderson",
-      photo: "",
-      department: "English",
-    },
-    {
-      id: "t4",
-      name: "Mike Johnson",
-      photo: "",
-      department: "Physics",
-    },
-  ];
-
-  // Mock camera data
-  const cameras = Array.from({ length: 15 }, (_, i) => ({
-    id: `cam${i + 1}`,
-    name: `Camera ${String(i + 1).padStart(2, "0")}`,
-    location: `Location ${i + 1}`,
-  }));
 
   const departments = [
     "Computer Science",
@@ -171,7 +140,7 @@ export function CreateEditClassModal({
   const handleSubmit = () => {
     if (validateForm()) {
       const selectedTeacher = formData.teacherId !== "none"
-        ? teachers.find((t) => t.id === formData.teacherId)
+        ? teachers.find((t) => String(t.id) === formData.teacherId)
         : undefined;
 
       onSave({
@@ -182,7 +151,6 @@ export function CreateEditClassModal({
           ? {
               id: selectedTeacher.id,
               name: selectedTeacher.name,
-              photo: selectedTeacher.photo,
             }
           : null,
         enrollment: {
@@ -198,6 +166,8 @@ export function CreateEditClassModal({
         camera: formData.camera,
         semester: formData.semester,
         year: formData.year,
+        teacherId: selectedTeacher?.id ?? null,
+        cameraId: formData.camera ? Number(formData.camera) : null,
       });
     }
   };
@@ -302,10 +272,12 @@ export function CreateEditClassModal({
                 <SelectContent>
                   <SelectItem value="none">No teacher assigned</SelectItem>
                   {teachers.map((teacher) => (
-                    <SelectItem key={teacher.id} value={teacher.id}>
+                    <SelectItem key={teacher.id} value={String(teacher.id)}>
                       <div className="flex items-center space-x-2">
                         <span>{teacher.name}</span>
-                        <span className="text-gray-500">({teacher.department})</span>
+                        {teacher.department && (
+                          <span className="text-gray-500">{teacher.department}</span>
+                        )}
                       </div>
                     </SelectItem>
                   ))}
@@ -315,7 +287,6 @@ export function CreateEditClassModal({
               {selectedTeacher && (
                 <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg mt-2">
                   <Avatar className="w-10 h-10">
-                    <AvatarImage src={selectedTeacher.photo} alt={selectedTeacher.name} />
                     <AvatarFallback className="bg-blue-100 text-blue-600">
                       {selectedTeacher.name
                         .split(" ")
@@ -468,7 +439,7 @@ export function CreateEditClassModal({
                   </SelectTrigger>
                   <SelectContent>
                     {cameras.map((camera) => (
-                      <SelectItem key={camera.id} value={camera.name}>
+                      <SelectItem key={camera.id} value={String(camera.id)}>
                         {camera.name} - {camera.location}
                       </SelectItem>
                     ))}
