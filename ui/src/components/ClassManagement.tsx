@@ -800,21 +800,21 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
       {studentModalOpen && studentModalClass && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <Card className="w-full max-w-5xl max-h-[92vh] overflow-hidden bg-white relative animate-slide-up shadow-2xl">
-            <div className="bg-gradient-to-r from-slate-900 via-indigo-700 to-blue-700 p-4 text-white flex items-center justify-between shadow-lg">
+            <div className="bg-gradient-to-r from-slate-50 via-white to-indigo-50 p-4 text-slate-900 flex items-center justify-between shadow-sm border-b border-slate-200">
               <div>
-                <p className="text-xs uppercase tracking-wide text-white/80">Class tools</p>
-                <h3 className="text-xl font-semibold text-white drop-shadow">{studentModalClass.name}</h3>
-                <p className="text-sm text-white/90">Manage roster and attendance with live data</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Class tools</p>
+                <h3 className="text-xl font-semibold text-slate-900">{studentModalClass.name}</h3>
+                <p className="text-sm text-slate-600">Manage roster and attendance with live data</p>
               </div>
               <Button
-                variant="secondary"
+                variant="outline"
                 onClick={() => {
                   setStudentModalClass(null);
                   setStudentModalOpen(false);
                   setStudentModalError(null);
                   setStudentModalTab("students");
                 }}
-                className="bg-white/15 hover:bg-white/25 text-white border-white/30"
+                className="bg-white hover:bg-slate-50"
               >
                 Close
               </Button>
