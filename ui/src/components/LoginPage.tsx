@@ -6,21 +6,40 @@ import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ScanFace, Lock, User } from "lucide-react";
+import { AuthPayload, loginUser } from "../lib/api";
+
+import { cn } from "./ui/utils";
 
 interface LoginPageProps {
-  onLogin: (role: string) => void;
+  onLogin: (payload: AuthPayload) => void;
+  onForgotPassword?: () => void;
 }
 
-export function LoginPage({ onLogin }: LoginPageProps) {
-  const [username, setUsername] = useState("");
+export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState("student");
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username && password && role) {
-      onLogin(role);
+    if (!email || !password || !role) {
+      setError("Email, password, and role are required");
+      return;
+    }
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const payload = await loginUser(email, password, role || undefined);
+      onLogin(payload);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Login failed";
+      setError(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -55,7 +74,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
               <Select value={role} onValueChange={setRole}>
-                <SelectTrigger id="role" className="w-full">
+                <SelectTrigger id="role" className="w-full" aria-required="true">
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -66,17 +85,17 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </Select>
             </div>
 
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Email</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   required
                 />
@@ -115,24 +134,31 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   Remember Me
                 </Label>
               </div>
-              <a
-                href="#"
+              <button
+                type="button"
                 className="text-blue-600 hover:text-blue-700 transition-colors"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log("Forgot password clicked");
-                }}
+                onClick={() => onForgotPassword?.()}
               >
                 Forgot Password?
-              </a>
+              </button>
             </div>
 
             {/* Login Button */}
+            {error && (
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+                {error}
+              </div>
+            )}
+
             <Button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className={cn(
+                "w-full bg-blue-600 hover:bg-blue-700",
+                isLoading && "opacity-80 cursor-not-allowed"
+              )}
+              disabled={isLoading}
             >
-              Login
+              {isLoading ? "Checking credentials..." : "Login"}
             </Button>
           </CardContent>
         </form>

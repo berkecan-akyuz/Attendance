@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DashboardNav } from "./DashboardNav";
 import { DashboardStats } from "./DashboardStats";
 import { QuickActions } from "./QuickActions";
@@ -6,6 +6,7 @@ import { RecentActivity } from "./RecentActivity";
 import { AttendanceOverview } from "./AttendanceOverview";
 import { UserManagement } from "./UserManagement";
 import { ClassManagement } from "./ClassManagement";
+import { fetchOverviewStats, OverviewStats } from "../lib/api";
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -31,6 +32,23 @@ export function AdminDashboard({
   currentActivePage = "Dashboard"
 }: AdminDashboardProps) {
   const [currentPage, setCurrentPage] = useState("Dashboard");
+  const [stats, setStats] = useState<OverviewStats | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      setStatsError(null);
+      try {
+        const data = await fetchOverviewStats();
+        setStats(data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load stats";
+        setStatsError(message);
+      }
+    };
+
+    loadStats();
+  }, []);
 
   const handlePageChange = (page: string) => {
     // Handle navigation
@@ -71,7 +89,12 @@ export function AdminDashboard({
       {currentPage === "Dashboard" && (
         <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
           {/* Dashboard Stats */}
-          <DashboardStats 
+          {statsError && (
+            <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+              {statsError}
+            </div>
+          )}
+          <DashboardStats
             onNavigateToUsers={(filter) => {
               setCurrentPage("Users");
               // Filter can be used by UserManagement component
@@ -81,6 +104,7 @@ export function AdminDashboard({
               onNavigateToReports();
               // Filter can be passed to reports page
             }}
+            stats={stats}
           />
 
           {/* Quick Actions */}

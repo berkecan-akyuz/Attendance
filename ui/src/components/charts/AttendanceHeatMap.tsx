@@ -1,26 +1,17 @@
 interface AttendanceHeatMapProps {
   compact?: boolean;
+  data?: Array<{ date: string; attendance: number }>;
 }
 
-export function AttendanceHeatMap({ compact = false }: AttendanceHeatMapProps) {
-  // Generate mock data for the last 35 days (5 weeks)
+export function AttendanceHeatMap({ compact = false, data = [] }: AttendanceHeatMapProps) {
   const generateHeatMapData = () => {
-    const data = [];
-    const weeks = 5;
-    const daysPerWeek = 7;
-    
-    for (let week = 0; week < weeks; week++) {
-      for (let day = 0; day < daysPerWeek; day++) {
-        // Random attendance percentage between 70-100%
-        const attendance = Math.floor(Math.random() * 30) + 70;
-        data.push({
-          week,
-          day,
-          attendance,
-        });
-      }
-    }
-    return data;
+    if (!data.length) return [] as { week: number; day: number; attendance: number }[];
+
+    return data.map((item, index) => ({
+      week: Math.floor(index / 7),
+      day: index % 7,
+      attendance: item.attendance,
+    }));
   };
 
   const heatMapData = generateHeatMapData();
@@ -34,6 +25,14 @@ export function AttendanceHeatMap({ compact = false }: AttendanceHeatMapProps) {
     if (attendance >= 75) return 'bg-yellow-500';
     return 'bg-red-500';
   };
+
+  if (!heatMapData.length) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-gray-500 border border-dashed rounded-lg bg-white">
+        No attendance heat map data available
+      </div>
+    );
+  }
 
   if (compact) {
     return (
