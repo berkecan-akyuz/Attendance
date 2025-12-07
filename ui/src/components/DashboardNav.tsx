@@ -12,16 +12,17 @@ import { ScanFace, LogOut, User, Settings } from "lucide-react";
 import { Bell } from "lucide-react";
 import { Badge } from "./ui/badge";
 
-interface DashboardNavProps {
-  currentPage: string;
-  onPageChange: (page: string) => void;
-  onLogout: () => void;
-  userRole: string;
-  onNavigateToSettings?: () => void;
-  onNavigateToNotifications?: () => void;
-}
+  interface DashboardNavProps {
+    currentPage: string;
+    onPageChange: (page: string) => void;
+    onLogout: () => void;
+    userRole: string;
+    onNavigateToSettings?: () => void;
+    onNavigateToNotifications?: () => void;
+    unreadCount?: number;
+  }
 
-export function DashboardNav({ currentPage, onPageChange, onLogout, userRole, onNavigateToSettings, onNavigateToNotifications }: DashboardNavProps) {
+  export function DashboardNav({ currentPage, onPageChange, onLogout, userRole, onNavigateToSettings, onNavigateToNotifications, unreadCount = 0 }: DashboardNavProps) {
   // Define navigation items based on role
   const getNavItems = () => {
     if (userRole === "admin") {
@@ -104,9 +105,11 @@ export function DashboardNav({ currentPage, onPageChange, onLogout, userRole, on
                 onClick={onNavigateToNotifications}
               >
                 <Bell className="w-5 h-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white">
-                  3
-                </Badge>
+                {unreadCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center p-0 bg-red-500 text-white">
+                    {unreadCount}
+                  </Badge>
+                )}
               </button>
             )}
 

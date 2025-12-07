@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -34,6 +34,7 @@ import {
   FileSpreadsheet,
   File
 } from "lucide-react";
+import { AttendanceReports, fetchAttendanceReports, fetchLectureSummaries, LectureSummary } from "../lib/api";
 
 interface StudentAttendance {
   id: string;
@@ -49,21 +50,25 @@ interface StudentAttendance {
 interface ReportsAnalyticsProps {
   onBack: () => void;
   userRole: "admin" | "teacher";
+  userId?: number | null;
   onLogout?: () => void;
   onNavigateToSettings?: () => void;
   onNavigateToNotifications?: () => void;
-  onNavigateToDashboard?: () => void;
+  onNavigateToDashboard?: (section?: string) => void;
   onNavigateToCameras?: () => void;
+  unreadCount?: number;
 }
 
-export function ReportsAnalytics({ 
-  onBack, 
+export function ReportsAnalytics({
+  onBack,
   userRole,
+  userId,
   onLogout,
   onNavigateToSettings,
   onNavigateToNotifications,
   onNavigateToDashboard,
-  onNavigateToCameras
+  onNavigateToCameras,
+  unreadCount = 0
 }: ReportsAnalyticsProps) {
   const [selectedClass, setSelectedClass] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
@@ -71,84 +76,128 @@ export function ReportsAnalytics({
   const [dateTo, setDateTo] = useState("");
   const [dateRange, setDateRange] = useState("last30");
 
-  // Mock data
-  const studentData: StudentAttendance[] = [
-    {
-      id: "1",
-      name: "John Smith",
-      rollNumber: "CS-2023-001",
-      totalClasses: 45,
-      present: 42,
-      absent: 2,
-      late: 1,
-      percentage: 93.3,
-    },
-    {
-      id: "2",
-      name: "Sarah Johnson",
-      rollNumber: "CS-2023-002",
-      totalClasses: 45,
-      present: 44,
-      absent: 1,
-      late: 0,
-      percentage: 97.8,
-    },
-    {
-      id: "3",
-      name: "Mike Davis",
-      rollNumber: "CS-2023-003",
-      totalClasses: 45,
-      present: 38,
-      absent: 4,
-      late: 3,
-      percentage: 84.4,
-    },
-    {
-      id: "4",
-      name: "Emily Brown",
-      rollNumber: "CS-2023-004",
-      totalClasses: 45,
-      present: 40,
-      absent: 3,
-      late: 2,
-      percentage: 88.9,
-    },
-    {
-      id: "5",
-      name: "David Wilson",
-      rollNumber: "CS-2023-005",
-      totalClasses: 45,
-      present: 45,
-      absent: 0,
-      late: 0,
-      percentage: 100,
-    },
-    {
-      id: "6",
-      name: "Lisa Anderson",
-      rollNumber: "CS-2023-006",
-      totalClasses: 45,
-      present: 35,
-      absent: 7,
-      late: 3,
-      percentage: 77.8,
-    },
-  ];
+  
+  const [reports, setReports] = useState<AttendanceReports | null>(null);
+  const [classes, setClasses] = useState<LectureSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredStudents = studentData.filter((student) =>
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [reportData, lectureData] = await Promise.all([
+          fetchAttendanceReports(userRole === "teacher" ? userId || undefined : undefined),
+          fetchLectureSummaries(
+            userRole === "teacher" && userId ? { teacherUserId: userId } : undefined
+          ),
+        ]);
+        setReports(reportData);
+        setClasses(lectureData);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load reports";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [userId, userRole]);
+
+  const tableRows = useMemo(() => {
+    if (!reports) return [];
+    return reports.classes.map((cls) => {
+      const percentage = cls.total ? Math.round((cls.present / cls.total) * 1000) / 10 : 0;
+      return {
+        id: String(cls.lecture_id),
+        name: cls.lecture_name,
+        rollNumber: `Lecture ${cls.lecture_id}`,
+        totalClasses: cls.total,
+        present: cls.present,
+        absent: cls.absent,
+        late: cls.late,
+        percentage,
+      } as StudentAttendance;
+    });
+  }, [reports]);
+
+  const filteredStudents = tableRows.filter((student) =>
     student.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
     student.rollNumber.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
   const stats = {
-    averageAttendance: 90.4,
-    totalClasses: userRole === "admin" ? 450 : 45,
-    mostAttended: "Computer Science - 10A",
-    lowestDay: "Friday",
+    averageAttendance: reports?.average_attendance || 0,
+    totalClasses: reports?.classes.length || 0,
+    mostAttended: reports?.classes[0]?.lecture_name || "N/A",
+    lowestDay: reports?.recent_sessions[0]?.session_date || "Most recent",
   };
 
+  const trendData = useMemo(() => {
+    if (!reports?.recent_sessions) return [] as Array<{ date: string; attendance: number }>;
+    return reports.recent_sessions.map((session) => {
+      const total = session.present + session.absent + session.late;
+      const attendance = total ? Math.round((session.present / total) * 1000) / 10 : 0;
+      return {
+        date: session.session_date || `Session ${session.session_id}`,
+        attendance,
+      };
+    });
+  }, [reports]);
+
+  const statusData = useMemo(() => {
+    const base = reports?.status;
+    if (!base) return [] as Array<{ name: string; value: number; percentage?: number }>;
+    const total = base.present + base.absent + base.late + (base.unknown || 0);
+    const pct = (val: number) => (total ? Math.round((val / total) * 1000) / 10 : 0);
+    return [
+      { name: "Present", value: base.present, percentage: pct(base.present) },
+      { name: "Absent", value: base.absent, percentage: pct(base.absent) },
+      { name: "Late", value: base.late, percentage: pct(base.late) },
+    ];
+  }, [reports]);
+
+  const heatMapData = useMemo(
+    () =>
+      trendData.map((item) => ({
+        date: item.date,
+        attendance: item.attendance,
+      })),
+    [trendData]
+  );
+
+  const comparisonData = useMemo(() => {
+    if (!reports?.classes) return [] as Array<{ class: string; attendance: number }>;
+    return reports.classes.map((cls) => {
+      const total = cls.total || cls.present + cls.absent + cls.late;
+      const attendance = total ? Math.round((cls.present / total) * 1000) / 10 : 0;
+      return { class: cls.lecture_name, attendance };
+    });
+  }, [reports]);
+
   const handleGenerateReport = () => {
-    console.log("Generating report...");
+    if (!reports) return;
+    const rows = [
+      ["Lecture", "Date", "Present", "Absent", "Late", "Status"],
+      ...(reports.recent_sessions || []).map((s) => [
+        s.lecture_name,
+        s.session_date,
+        s.present,
+        s.absent,
+        s.late,
+        s.status,
+      ]),
+    ];
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "attendance-report.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleExport = (format: string) => {
@@ -180,7 +229,9 @@ export function ReportsAnalytics({
 
   const handlePageChange = (page: string) => {
     if (page === "Dashboard") {
-      onBack();
+      onNavigateToDashboard?.("Dashboard");
+    } else if ((page === "Users" || page === "Classes") && onNavigateToDashboard) {
+      onNavigateToDashboard(page);
     } else if (page === "Settings" && onNavigateToSettings) {
       onNavigateToSettings();
     } else if (page === "Cameras" && onNavigateToCameras) {
@@ -193,13 +244,14 @@ export function ReportsAnalytics({
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
       {onLogout && onNavigateToSettings && onNavigateToNotifications && (
-        <DashboardNav 
+        <DashboardNav
           currentPage="Reports"
           onPageChange={handlePageChange}
           onLogout={onLogout}
           userRole={userRole}
           onNavigateToSettings={onNavigateToSettings}
           onNavigateToNotifications={onNavigateToNotifications}
+          unreadCount={unreadCount}
         />
       )}
 
@@ -242,6 +294,12 @@ export function ReportsAnalytics({
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        {error && (
+          <Card className="p-4 border-red-200 bg-red-50 text-red-700">{error}</Card>
+        )}
+        {loading && (
+          <Card className="p-4 border-blue-100 bg-blue-50 text-blue-700">Loading reports...</Card>
+        )}
         {/* Filter Section */}
         <Card className="p-6">
           <div className="space-y-4">
@@ -249,17 +307,18 @@ export function ReportsAnalytics({
               <div className="space-y-2">
                 <Label>Class/Section</Label>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={userRole === "admin" ? "All Classes" : "Select class"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {userRole === "admin" && <SelectItem value="all">All Classes</SelectItem>}
-                    <SelectItem value="cs-10a">Computer Science - 10A</SelectItem>
-                    <SelectItem value="cs-10b">Computer Science - 10B</SelectItem>
-                    <SelectItem value="math-11a">Mathematics - 11A</SelectItem>
-                    <SelectItem value="eng-12a">English - 12A</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SelectTrigger>
+                  <SelectValue placeholder={userRole === "admin" ? "All Classes" : "Select class"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {userRole === "admin" && <SelectItem value="all">All Classes</SelectItem>}
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.lecture_id} value={String(cls.lecture_id)}>
+                      {cls.lecture_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               </div>
 
               <div className="space-y-2">
@@ -326,7 +385,7 @@ export function ReportsAnalytics({
               <div>
                 <p className="text-gray-600 mb-1">Average Attendance</p>
                 <p className="text-gray-900 mb-2">{stats.averageAttendance}%</p>
-                <p className="text-green-600">+2.3% from last month</p>
+                <p className="text-gray-500">Based on recent sessions</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-green-600" />
@@ -352,7 +411,7 @@ export function ReportsAnalytics({
               <div>
                 <p className="text-gray-600 mb-1">Most Attended</p>
                 <p className="text-gray-900 mb-2">{stats.mostAttended}</p>
-                <p className="text-green-600">96.5% attendance</p>
+                <p className="text-gray-500">Highest attendance class</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Award className="w-6 h-6 text-purple-600" />
@@ -365,7 +424,7 @@ export function ReportsAnalytics({
               <div>
                 <p className="text-gray-600 mb-1">Lowest Attendance</p>
                 <p className="text-gray-900 mb-2">{stats.lowestDay}</p>
-                <p className="text-red-600">82.1% average</p>
+                <p className="text-gray-500">Most recent low session</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -390,7 +449,7 @@ export function ReportsAnalytics({
                   <CardTitle>Attendance Trend</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <AttendanceTrendChart />
+                  <AttendanceTrendChart data={trendData} />
                 </CardContent>
               </Card>
 
@@ -399,19 +458,19 @@ export function ReportsAnalytics({
                   <CardTitle>Status Distribution</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <StatusDistributionChart />
+                  <StatusDistributionChart data={statusData} />
                 </CardContent>
               </Card>
             </div>
 
             <Card className="p-6">
-              <CardHeader className="p-0 mb-4">
-                <CardTitle>Attendance Calendar Heat Map</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <AttendanceHeatMap />
-              </CardContent>
-            </Card>
+                <CardHeader className="p-0 mb-4">
+                  <CardTitle>Attendance Calendar Heat Map</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                <AttendanceHeatMap data={heatMapData} />
+                </CardContent>
+              </Card>
           </TabsContent>
 
           {/* Detailed Report Tab */}
@@ -487,7 +546,7 @@ export function ReportsAnalytics({
                   <CardTitle>Daily Attendance Trend</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <AttendanceTrendChart />
+                  <AttendanceTrendChart data={trendData} />
                 </CardContent>
               </Card>
 
@@ -496,7 +555,7 @@ export function ReportsAnalytics({
                   <CardTitle>Class Comparison</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ClassComparisonChart userRole={userRole} />
+                  <ClassComparisonChart userRole={userRole} data={comparisonData} />
                 </CardContent>
               </Card>
 
@@ -505,7 +564,7 @@ export function ReportsAnalytics({
                   <CardTitle>Attendance Distribution</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <StatusDistributionChart />
+                  <StatusDistributionChart data={statusData} />
                 </CardContent>
               </Card>
 
@@ -515,7 +574,7 @@ export function ReportsAnalytics({
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="h-64 flex items-center justify-center text-gray-400">
-                    <AttendanceHeatMap compact />
+                    <AttendanceHeatMap compact data={heatMapData} />
                   </div>
                 </CardContent>
               </Card>
