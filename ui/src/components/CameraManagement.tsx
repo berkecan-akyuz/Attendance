@@ -37,9 +37,10 @@ interface CameraManagementProps {
   onLogout?: () => void;
   onNavigateToSettings?: () => void;
   onNavigateToNotifications?: () => void;
-  onNavigateToDashboard?: () => void;
+  onNavigateToDashboard?: (section?: string) => void;
   onNavigateToReports?: () => void;
   userRole?: string;
+  unreadCount?: number;
 }
 
 export function CameraManagement({
@@ -49,7 +50,8 @@ export function CameraManagement({
   onNavigateToNotifications,
   onNavigateToDashboard,
   onNavigateToReports,
-  userRole = "admin"
+  userRole = "admin",
+  unreadCount = 0
 }: CameraManagementProps) {
   const [activeFilter, setActiveFilter] = useState<"all" | "online" | "offline" | "unassigned">("all");
   const [editingCamera, setEditingCamera] = useState<CameraData | null>(null);
@@ -177,7 +179,9 @@ export function CameraManagement({
 
   const handlePageChange = (page: string) => {
     if (page === "Dashboard") {
-      onBack();
+      onNavigateToDashboard?.("Dashboard");
+    } else if ((page === "Users" || page === "Classes") && onNavigateToDashboard) {
+      onNavigateToDashboard(page);
     } else if (page === "Settings" && onNavigateToSettings) {
       onNavigateToSettings();
     } else if (page === "Reports" && onNavigateToReports) {
@@ -190,13 +194,14 @@ export function CameraManagement({
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
       {onLogout && onNavigateToSettings && onNavigateToNotifications && (
-        <DashboardNav 
+        <DashboardNav
           currentPage="Cameras"
           onPageChange={handlePageChange}
           onLogout={onLogout}
           userRole={userRole}
           onNavigateToSettings={onNavigateToSettings}
           onNavigateToNotifications={onNavigateToNotifications}
+          unreadCount={unreadCount}
         />
       )}
 

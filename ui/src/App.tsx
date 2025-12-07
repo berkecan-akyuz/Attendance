@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoginPage } from "./components/LoginPage";
 import { ForgotPassword } from "./components/ForgotPassword";
 import { AdminDashboard } from "./components/AdminDashboard";
@@ -10,7 +10,9 @@ import { StudentPortal } from "./components/StudentPortal";
 import { SystemSettings } from "./components/SystemSettings";
 import { LiveMonitoring } from "./components/LiveMonitoring";
 import { NotificationsPanel } from "./components/NotificationsPanel";
-import { AuthPayload } from "./lib/api";
+import { AuthPayload, fetchNotifications } from "./lib/api";
+
+type AdminSection = "Dashboard" | "Users" | "Classes" | "Cameras" | "Reports" | "Settings";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<
@@ -28,11 +30,29 @@ export default function App() {
   >("login");
   const [userRole, setUserRole] = useState<string>("");
   const [auth, setAuth] = useState<AuthPayload | null>(null);
+  const [adminSection, setAdminSection] = useState<AdminSection>("Dashboard");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      if (!auth) return;
+      try {
+        const payload = await fetchNotifications();
+        const unread = payload.filter((item) => !item.read).length;
+        setUnreadNotifications(unread);
+      } catch (err) {
+        console.warn("Unable to refresh notifications", err);
+      }
+    };
+
+    loadNotifications();
+  }, [auth]);
 
   const handleLogin = (payload: AuthPayload) => {
     const normalizedRole = payload.role?.toLowerCase() || "";
     setUserRole(normalizedRole);
     setAuth(payload);
+    setAdminSection("Dashboard");
     // Route based on role
     if (normalizedRole === "admin") {
       setCurrentPage("dashboard");
@@ -47,6 +67,11 @@ export default function App() {
     setUserRole("");
     setAuth(null);
     setCurrentPage("login");
+  };
+
+  const handleAdminSectionChange = (section: AdminSection) => {
+    setAdminSection(section);
+    setCurrentPage("dashboard");
   };
 
   const handleNavigateToForgot = () => setCurrentPage("forgot");
@@ -77,7 +102,7 @@ export default function App() {
 
   const handleBackToDashboard = () => {
     if (userRole === "admin") {
-      setCurrentPage("dashboard");
+      handleAdminSectionChange("Dashboard");
     } else if (userRole === "teacher") {
       setCurrentPage("attendance");
     } else if (userRole === "student") {
@@ -103,7 +128,10 @@ export default function App() {
           onNavigateToLive={handleNavigateToLive}
           onNavigateToNotifications={handleNavigateToNotifications}
           userRole={userRole}
-          currentActivePage="Dashboard"
+          currentActivePage={adminSection}
+          activeSection={adminSection}
+          onSectionChange={handleAdminSectionChange}
+          unreadCount={unreadNotifications}
         />
       )}
       {currentPage === "register" && (
@@ -120,14 +148,15 @@ export default function App() {
         />
       )}
       {currentPage === "cameras" && userRole === "admin" && (
-        <CameraManagement 
+        <CameraManagement
           onBack={handleBackToDashboard}
           onLogout={handleLogout}
           onNavigateToSettings={handleNavigateToSettings}
           onNavigateToNotifications={handleNavigateToNotifications}
-          onNavigateToDashboard={handleBackToDashboard}
+          onNavigateToDashboard={handleAdminSectionChange}
           onNavigateToReports={handleNavigateToReports}
           userRole={userRole}
+          unreadCount={unreadNotifications}
         />
       )}
       {currentPage === "reports" && (
@@ -138,8 +167,9 @@ export default function App() {
           onLogout={handleLogout}
           onNavigateToSettings={handleNavigateToSettings}
           onNavigateToNotifications={handleNavigateToNotifications}
-          onNavigateToDashboard={handleBackToDashboard}
+          onNavigateToDashboard={handleAdminSectionChange}
           onNavigateToCameras={handleNavigateToCameras}
+          unreadCount={unreadNotifications}
         />
       )}
       {currentPage === "student" && userRole === "student" && (
@@ -150,14 +180,15 @@ export default function App() {
         />
       )}
       {currentPage === "settings" && userRole === "admin" && (
-        <SystemSettings 
+        <SystemSettings
           onBack={handleBackToDashboard}
           onLogout={handleLogout}
           onNavigateToNotifications={handleNavigateToNotifications}
-          onNavigateToDashboard={handleBackToDashboard}
+          onNavigateToDashboard={handleAdminSectionChange}
           onNavigateToReports={handleNavigateToReports}
           onNavigateToCameras={handleNavigateToCameras}
           userRole={userRole}
+          unreadCount={unreadNotifications}
         />
       )}
       {currentPage === "live" && (userRole === "admin" || userRole === "teacher") && (
@@ -170,6 +201,7 @@ export default function App() {
         <NotificationsPanel
           onBack={handleBackToDashboard}
           userRole={userRole as "admin" | "teacher" | "student"}
+          onUnreadChange={setUnreadNotifications}
         />
       )}
     </>

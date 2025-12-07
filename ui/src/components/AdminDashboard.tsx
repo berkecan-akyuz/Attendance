@@ -18,6 +18,9 @@ interface AdminDashboardProps {
   onNavigateToNotifications: () => void;
   userRole: string;
   currentActivePage?: string; // Track which top-level page is active
+  activeSection?: string;
+  onSectionChange?: (section: string) => void;
+  unreadCount?: number;
 }
 
 export function AdminDashboard({ 
@@ -26,14 +29,23 @@ export function AdminDashboard({
   onNavigateToCameras, 
   onNavigateToReports, 
   onNavigateToSettings, 
-  onNavigateToLive, 
-  onNavigateToNotifications, 
+  onNavigateToLive,
+  onNavigateToNotifications,
   userRole,
-  currentActivePage = "Dashboard"
+  currentActivePage = "Dashboard",
+  activeSection,
+  onSectionChange,
+  unreadCount = 0,
 }: AdminDashboardProps) {
-  const [currentPage, setCurrentPage] = useState("Dashboard");
+  const [currentPage, setCurrentPage] = useState(activeSection || "Dashboard");
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeSection && activeSection !== currentPage) {
+      setCurrentPage(activeSection);
+    }
+  }, [activeSection, currentPage]);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -60,6 +72,7 @@ export function AdminDashboard({
       onNavigateToSettings();
     } else {
       setCurrentPage(page);
+      onSectionChange?.(page);
     }
   };
 
@@ -76,13 +89,14 @@ export function AdminDashboard({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      <DashboardNav 
-        currentPage={getActivePage()} 
+      <DashboardNav
+        currentPage={getActivePage()}
         onPageChange={handlePageChange}
         onLogout={onLogout}
         userRole={userRole}
         onNavigateToSettings={onNavigateToSettings}
         onNavigateToNotifications={onNavigateToNotifications}
+        unreadCount={unreadCount}
       />
 
       {/* Main Content */}

@@ -54,8 +54,9 @@ interface ReportsAnalyticsProps {
   onLogout?: () => void;
   onNavigateToSettings?: () => void;
   onNavigateToNotifications?: () => void;
-  onNavigateToDashboard?: () => void;
+  onNavigateToDashboard?: (section?: string) => void;
   onNavigateToCameras?: () => void;
+  unreadCount?: number;
 }
 
 export function ReportsAnalytics({
@@ -66,7 +67,8 @@ export function ReportsAnalytics({
   onNavigateToSettings,
   onNavigateToNotifications,
   onNavigateToDashboard,
-  onNavigateToCameras
+  onNavigateToCameras,
+  unreadCount = 0
 }: ReportsAnalyticsProps) {
   const [selectedClass, setSelectedClass] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
@@ -227,7 +229,9 @@ export function ReportsAnalytics({
 
   const handlePageChange = (page: string) => {
     if (page === "Dashboard") {
-      onBack();
+      onNavigateToDashboard?.("Dashboard");
+    } else if ((page === "Users" || page === "Classes") && onNavigateToDashboard) {
+      onNavigateToDashboard(page);
     } else if (page === "Settings" && onNavigateToSettings) {
       onNavigateToSettings();
     } else if (page === "Cameras" && onNavigateToCameras) {
@@ -247,6 +251,7 @@ export function ReportsAnalytics({
           userRole={userRole}
           onNavigateToSettings={onNavigateToSettings}
           onNavigateToNotifications={onNavigateToNotifications}
+          unreadCount={unreadCount}
         />
       )}
 

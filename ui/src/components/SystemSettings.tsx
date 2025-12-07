@@ -34,10 +34,11 @@ interface SystemSettingsProps {
   onBack: () => void;
   onLogout?: () => void;
   onNavigateToNotifications?: () => void;
-  onNavigateToDashboard?: () => void;
+  onNavigateToDashboard?: (section?: string) => void;
   onNavigateToReports?: () => void;
   onNavigateToCameras?: () => void;
   userRole?: string;
+  unreadCount?: number;
 }
 
 export function SystemSettings({ 
@@ -47,7 +48,8 @@ export function SystemSettings({
   onNavigateToDashboard,
   onNavigateToReports,
   onNavigateToCameras,
-  userRole = "admin"
+  userRole = "admin",
+  unreadCount = 0
 }: SystemSettingsProps) {
   const [activeSection, setActiveSection] = useState("general");
 

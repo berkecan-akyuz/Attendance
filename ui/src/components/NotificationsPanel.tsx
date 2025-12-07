@@ -33,9 +33,10 @@ interface Notification {
 interface NotificationsPanelProps {
   onBack: () => void;
   userRole: "admin" | "teacher" | "student";
+  onUnreadChange?: (count: number) => void;
 }
 
-export function NotificationsPanel({ onBack, userRole }: NotificationsPanelProps) {
+export function NotificationsPanel({ onBack, userRole, onUnreadChange }: NotificationsPanelProps) {
   const [activeTab, setActiveTab] = useState("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +86,10 @@ export function NotificationsPanel({ onBack, userRole }: NotificationsPanelProps
 
   const notificationList = roleFiltered;
   const unreadCount = notificationList.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    onUnreadChange?.(unreadCount);
+  }, [onUnreadChange, unreadCount]);
 
   const filteredNotifications =
     activeTab === "all"
