@@ -35,6 +35,7 @@ import {
   CameraResponse,
   createLecture,
   enrollStudentInLecture,
+  fetchAttendanceReports,
   fetchCameras,
   fetchLectureAttendanceSummary,
   fetchLectureStudents,
@@ -99,12 +100,25 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const [cameras, setCameras] = useState<CameraResponse[]>([]);
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [studentModalClass, setStudentModalClass] = useState<Class | null>(null);
+  const [studentModalTab, setStudentModalTab] = useState<"students" | "attendance">("students");
   const [classStudents, setClassStudents] = useState<ClassStudent[]>([]);
   const [availableStudents, setAvailableStudents] = useState<ClassStudent[]>([]);
   const [attendanceSummary, setAttendanceSummary] = useState<
     | { present: number; absent: number; late: number; unknown: number; total_records: number }
     | null
   >(null);
+  const [attendanceSessions, setAttendanceSessions] = useState<
+    Array<{
+      session_id: number;
+      lecture_id?: number;
+      lecture_name: string;
+      session_date: string | null;
+      present: number;
+      absent: number;
+      late: number;
+      status: string;
+    }>
+  >([]);
   const [studentModalLoading, setStudentModalLoading] = useState(false);
   const [studentModalError, setStudentModalError] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
@@ -238,13 +252,11 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   };
 
   const loadClassStudents = async (lectureId: number) => {
-    setStudentModalLoading(true);
     setStudentModalError(null);
     try {
-      const [enrolled, allStudents, summary] = await Promise.all([
+      const [enrolled, allStudents] = await Promise.all([
         fetchLectureStudents(lectureId).catch(() => []),
         fetchStudents().catch(() => []),
-        fetchLectureAttendanceSummary(lectureId),
       ]);
 
       const enrolledList = Array.isArray(enrolled) ? enrolled : [];
@@ -273,20 +285,72 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
       const enrolledUserIds = new Set(mappedEnrolled.map((s) => s.user_id));
       setAvailableStudents(mappedAvailable.filter((s) => !enrolledUserIds.has(s.user_id)));
       setClassStudents(mappedEnrolled);
-      setAttendanceSummary(summary || null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load class students";
       setStudentModalError(message);
-    } finally {
-      setStudentModalLoading(false);
     }
   };
 
-  const handleOpenStudents = (cls: Class) => {
+  const loadAttendanceSummary = async (lectureId: number) => {
+    try {
+      const summary = await fetchLectureAttendanceSummary(lectureId);
+      setAttendanceSummary(summary || null);
+    } catch (err) {
+      setAttendanceSummary(null);
+      if (err instanceof Error) {
+        setStudentModalError(err.message);
+      }
+    }
+  };
+
+  const loadAttendanceSessions = async (lectureId: number, lectureName?: string) => {
+    try {
+      const reports = await fetchAttendanceReports(
+        userRole === "teacher" && teacherUserId ? teacherUserId : undefined
+      );
+
+      const classRow = (reports.classes || []).find(
+        (item) => item.lecture_id === lectureId || item.lecture_name === lectureName
+      );
+
+      if (classRow) {
+        const unknown = Math.max(
+          0,
+          (classRow.total || 0) - (classRow.present || 0) - (classRow.absent || 0) - (classRow.late || 0)
+        );
+        setAttendanceSummary({
+          lecture_id: lectureId,
+          present: classRow.present || 0,
+          absent: classRow.absent || 0,
+          late: classRow.late || 0,
+          unknown,
+          total_records: classRow.total || 0,
+        });
+      }
+
+      const filteredSessions = (reports.recent_sessions || []).filter((session: any) => {
+        if (session.lecture_id !== undefined && session.lecture_id !== null) {
+          return Number(session.lecture_id) === lectureId;
+        }
+        return session.lecture_name === lectureName;
+      });
+
+      setAttendanceSessions(filteredSessions);
+    } catch (err) {
+      if (err instanceof Error) {
+        setStudentModalError(err.message);
+      }
+      setAttendanceSessions([]);
+    }
+  };
+
+  const handleOpenStudents = (cls: Class, tab: "students" | "attendance" = "students") => {
     setStudentModalClass(cls);
+    setStudentModalTab(tab);
     setSelectedStudentId("");
     setStudentModalError(null);
     setAttendanceSummary(null);
+    setAttendanceSessions([]);
     setClassStudents([]);
     setAvailableStudents([]);
     setStudentModalOpen(true);
@@ -295,15 +359,25 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   useEffect(() => {
     if (!studentModalOpen || !studentModalClass) return;
     const lectureId = Number(studentModalClass.id);
+    const lectureName = studentModalClass.name;
     setStudentModalLoading(true);
     setStudentModalError(null);
-    loadClassStudents(lectureId)
+
+    const loadData = async () => {
+      await loadClassStudents(lectureId);
+      await loadAttendanceSummary(lectureId);
+      if (studentModalTab === "attendance") {
+        await loadAttendanceSessions(lectureId, lectureName);
+      }
+    };
+
+    loadData()
       .catch((err) => {
         const message = err instanceof Error ? err.message : "Unable to load class details";
         setStudentModalError(message);
       })
       .finally(() => setStudentModalLoading(false));
-  }, [studentModalOpen, studentModalClass?.id]);
+  }, [studentModalOpen, studentModalClass?.id, studentModalTab]);
 
   const handleAddStudentToClass = async () => {
     if (!studentModalClass || !selectedStudentId) return;
@@ -662,7 +736,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={() => handleOpenStudents(cls)}
+                      onClick={() => handleOpenStudents(cls, "students")}
                     >
                       <Users className="w-4 h-4 mr-1" />
                       Students
@@ -671,7 +745,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={() => handleOpenStudents(cls)}
+                      onClick={() => handleOpenStudents(cls, "attendance")}
                     >
                       <ClipboardList className="w-4 h-4 mr-1" />
                       Attendance
@@ -708,115 +782,175 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
       )}
 
       {studentModalOpen && studentModalClass && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 bg-white relative">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <Card className="w-full max-w-5xl max-h-[92vh] overflow-hidden bg-white relative animate-slide-up shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-4 text-white flex items-center justify-between">
               <div>
-                <h3 className="text-gray-900">{studentModalClass.name}</h3>
-                <p className="text-gray-500">Manage students and attendance</p>
+                <p className="text-xs uppercase tracking-wide opacity-80">Class tools</p>
+                <h3 className="text-xl font-semibold">{studentModalClass.name}</h3>
+                <p className="text-sm text-white/80">Manage roster and attendance with live data</p>
               </div>
               <Button
-                variant="ghost"
+                variant="secondary"
                 onClick={() => {
                   setStudentModalClass(null);
                   setStudentModalOpen(false);
                   setStudentModalError(null);
+                  setStudentModalTab("students");
                 }}
+                className="bg-white/20 hover:bg-white/30 text-white"
               >
                 Close
               </Button>
             </div>
 
-            {studentModalError && (
-              <Card className="p-3 mb-3 border-red-200 bg-red-50 text-red-700">{studentModalError}</Card>
-            )}
-
-            {studentModalLoading && !studentModalError && (
-              <Card className="p-4 mb-4 bg-blue-50 border-blue-100 text-blue-700">
-                Loading class roster and attendance...
-              </Card>
-            )}
-
-            {attendanceSummary && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                {["present", "absent", "late", "unknown"].map((key) => {
-                  const value = (attendanceSummary as any)[key] || 0;
-                  const labels: Record<string, string> = {
-                    present: "Present",
-                    absent: "Absent",
-                    late: "Late",
-                    unknown: "Unknown",
-                  };
-                  return (
-                    <Card key={key} className="p-4 text-center">
-                      <p className="text-gray-500">{labels[key]}</p>
-                      <p className="text-gray-900 text-xl font-semibold">{value}</p>
-                    </Card>
-                  );
-                })}
-                <Card className="p-4 text-center">
-                  <p className="text-gray-500">Total Records</p>
-                  <p className="text-gray-900 text-xl font-semibold">
-                    {attendanceSummary.total_records || 0}
-                  </p>
-                </Card>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-gray-900">Enrolled Students</h4>
-                  {studentModalLoading && <span className="text-sm text-gray-500">Refreshing...</span>}
-                </div>
-                <Card className="divide-y">
-                  {classStudents.length === 0 ? (
-                    <div className="p-4 text-gray-500">No students enrolled yet.</div>
-                  ) : (
-                    classStudents.map((student) => (
-                      <div key={student.student_id || student.user_id} className="p-4 flex items-center justify-between">
-                        <div>
-                          <p className="text-gray-900">{student.full_name || "Unnamed"}</p>
-                          <p className="text-gray-500 text-sm">{student.email}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-600">Roll: {student.roll_number || "N/A"}</p>
-                          <p className="text-xs text-gray-500">Status: {student.enrollment_status || "Active"}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </Card>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-gray-900">Add Student to Class</h4>
-                <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableStudents.length === 0 ? (
-                      <SelectItem value="" disabled>
-                        No available students
-                      </SelectItem>
-                    ) : (
-                      availableStudents.map((student) => (
-                        <SelectItem key={student.user_id} value={String(student.user_id)}>
-                          {student.full_name || student.email || "Student"}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
                 <Button
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  onClick={handleAddStudentToClass}
-                  disabled={!selectedStudentId || studentModalLoading}
+                  variant={studentModalTab === "students" ? "default" : "outline"}
+                  onClick={() => setStudentModalTab("students")}
+                  className="transition-all"
                 >
-                  Add Student
+                  Students
                 </Button>
+                <Button
+                  variant={studentModalTab === "attendance" ? "default" : "outline"}
+                  onClick={() => setStudentModalTab("attendance")}
+                  className="transition-all"
+                >
+                  Attendance
+                </Button>
+                {studentModalLoading && <span className="text-sm text-gray-500">Loading...</span>}
               </div>
+
+              {studentModalError && (
+                <Card className="p-3 border-red-200 bg-red-50 text-red-700">{studentModalError}</Card>
+              )}
+
+              {studentModalTab === "attendance" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {["present", "absent", "late", "unknown"].map((key) => {
+                      const value = (attendanceSummary as any)?.[key] || 0;
+                      const labels: Record<string, string> = {
+                        present: "Present",
+                        absent: "Absent",
+                        late: "Late",
+                        unknown: "Unknown",
+                      };
+                      return (
+                        <Card key={key} className="p-4 text-center floating-card animate-fade-in">
+                          <p className="text-gray-500">{labels[key]}</p>
+                          <p className="text-gray-900 text-xl font-semibold">{value}</p>
+                        </Card>
+                      );
+                    })}
+                    <Card className="p-4 text-center floating-card animate-fade-in">
+                      <p className="text-gray-500">Total Records</p>
+                      <p className="text-gray-900 text-xl font-semibold">
+                        {attendanceSummary?.total_records || 0}
+                      </p>
+                    </Card>
+                  </div>
+
+                  <Card className="p-4 space-y-3 floating-card animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-gray-900">Recent Sessions</h4>
+                      <span className="text-sm text-gray-500">
+                        {attendanceSessions.length} session{attendanceSessions.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    {attendanceSessions.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No attendance sessions recorded for this class yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {attendanceSessions.map((session) => (
+                          <div
+                            key={session.session_id}
+                            className="flex items-center justify-between border rounded-lg p-3 transition-all hover:border-blue-200"
+                          >
+                            <div>
+                              <p className="text-gray-900 font-medium">{session.lecture_name}</p>
+                              <p className="text-gray-500 text-sm">
+                                {session.session_date || "Unscheduled"}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-gray-600">
+                              <span className="flex items-center gap-1"><Clock className="w-4 h-4" />
+                                {session.status}
+                              </span>
+                              <span className="text-green-600">P {session.present}</span>
+                              <span className="text-red-600">A {session.absent}</span>
+                              <span className="text-yellow-600">L {session.late}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              )}
+
+              {studentModalTab === "students" && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fade-in">
+                  <div className="lg:col-span-2 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-gray-900">Enrolled Students</h4>
+                      {studentModalLoading && <span className="text-sm text-gray-500">Refreshing...</span>}
+                    </div>
+                    <Card className="divide-y floating-card">
+                      {classStudents.length === 0 ? (
+                        <div className="p-4 text-gray-500">No students enrolled yet.</div>
+                      ) : (
+                        classStudents.map((student) => (
+                          <div
+                            key={student.student_id || student.user_id}
+                            className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                          >
+                            <div>
+                              <p className="text-gray-900 font-medium">{student.full_name || "Unnamed"}</p>
+                              <p className="text-gray-500 text-sm">{student.email}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-gray-600">Roll: {student.roll_number || "N/A"}</p>
+                              <p className="text-xs text-gray-500">Status: {student.enrollment_status || "Active"}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </Card>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-gray-900">Add Student to Class</h4>
+                    <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a student" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableStudents.length === 0 ? (
+                          <SelectItem value="no-students" disabled>
+                            No available students
+                          </SelectItem>
+                        ) : (
+                          availableStudents.map((student) => (
+                            <SelectItem key={student.user_id} value={String(student.user_id)}>
+                              {student.full_name || student.email || "Student"}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      onClick={handleAddStudentToClass}
+                      disabled={!selectedStudentId || studentModalLoading}
+                    >
+                      Add Student
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         </div>
