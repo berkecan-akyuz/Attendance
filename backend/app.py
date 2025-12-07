@@ -1036,6 +1036,28 @@ def register_routes(app: Flask) -> None:
             payload["lecture_name"] = camera.lecture.lecture_name
         return jsonify(payload)
 
+    @app.route("/api/cameras/<int:camera_id>", methods=["DELETE"])
+    def delete_camera(camera_id: int):
+        camera = Camera.query.get(camera_id)
+        if not camera:
+            return error_response("Camera not found", 404)
+
+        try:
+            # Unassign the camera from any lecture before removal
+            lecture_id = camera.assigned_lecture_id
+            if lecture_id:
+                camera.assigned_lecture_id = None
+                Lecture.query.filter_by(lecture_id=lecture_id, camera_id=camera_id).update(
+                    {"camera_id": None}
+                )
+
+            db.session.delete(camera)
+            db.session.commit()
+            return jsonify({"message": "Camera deleted"})
+        except Exception as exc:  # pragma: no cover - safety rollback
+            db.session.rollback()
+            return error_response(f"Unable to delete camera: {exc}", 500)
+
 
 app = create_app()
 

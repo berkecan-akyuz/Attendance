@@ -758,13 +758,13 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center space-x-2 pt-4 border-t border-gray-200">
+                  <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-200">
                     {userRole === "admin" && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditClass(cls)}
-                        className="flex-1"
+                        className="flex-1 min-w-[120px]"
                       >
                         <Edit className="w-4 h-4 mr-1" />
                         Edit
@@ -774,7 +774,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 min-w-[120px]"
                         onClick={() => handleDeleteClass(cls)}
                       >
                         Delete
@@ -783,7 +783,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="flex-1 min-w-[120px]"
                       onClick={() => handleOpenStudents(cls, "students")}
                     >
                       <Users className="w-4 h-4 mr-1" />
@@ -792,7 +792,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="flex-1 min-w-[120px]"
                       onClick={() => handleOpenStudents(cls, "attendance")}
                     >
                       <ClipboardList className="w-4 h-4 mr-1" />

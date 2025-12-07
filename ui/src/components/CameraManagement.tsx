@@ -13,7 +13,13 @@ import {
   WifiOff,
   ArrowLeft
 } from "lucide-react";
-import { fetchCameras, CameraResponse, createCamera, updateCamera } from "../lib/api";
+import {
+  fetchCameras,
+  CameraResponse,
+  createCamera,
+  updateCamera,
+  deleteCamera,
+} from "../lib/api";
 
 interface CameraData {
   id: string;
@@ -98,9 +104,20 @@ export function CameraManagement({
     alert("Connection test successful!");
   };
 
-  const handleDeleteCamera = (cameraId: string) => {
-    if (confirm("Are you sure you want to delete this camera?")) {
+  const handleDeleteCamera = async (cameraId: string) => {
+    if (!confirm("Are you sure you want to delete this camera?")) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const numericId = Number(cameraId.replace("CAM-", ""));
+      await deleteCamera(numericId);
       setCameras(cameras.filter((cam) => cam.id !== cameraId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to delete camera";
+      setError(message);
+    } finally {
+      setSaving(false);
     }
   };
 

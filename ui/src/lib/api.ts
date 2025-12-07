@@ -364,6 +364,18 @@ export async function updateCamera(cameraId: number, data: Partial<CameraRespons
   return payload as CameraResponse;
 }
 
+export async function deleteCamera(cameraId: number): Promise<void> {
+  const response = await fetch(withBase(`/api/cameras/${cameraId}`), {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const message = (payload && payload.error) || "Unable to delete camera";
+    throw new Error(message);
+  }
+}
+
 export async function createLecture(data: Partial<LecturePayload>): Promise<LecturePayload> {
   const response = await fetch(withBase("/api/lectures"), {
     method: "POST",
