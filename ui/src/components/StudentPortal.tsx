@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -38,6 +38,7 @@ import {
   ChevronRight,
   Bell,
 } from "lucide-react";
+import { fetchStudentDashboard, StudentDashboard } from "../lib/api";
 
 interface AttendanceRecord {
   id: string;
@@ -49,61 +50,67 @@ interface AttendanceRecord {
 }
 
 interface StudentPortalProps {
+  userId?: number | null;
   onLogout: () => void;
   onNavigateToNotifications: () => void;
 }
 
-export function StudentPortal({ onLogout, onNavigateToNotifications }: StudentPortalProps) {
+export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: StudentPortalProps) {
   const [selectedFilter, setSelectedFilter] = useState("thisMonth");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [requestingCorrection, setRequestingCorrection] = useState<AttendanceRecord | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [dashboard, setDashboard] = useState<StudentDashboard | null>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock student data
-  const studentName = "John Smith";
-  const rollNumber = "CS-2023-001";
+  useEffect(() => {
+    const load = async () => {
+      if (!userId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchStudentDashboard(userId);
+        setDashboard(data);
+        const mapped = (data.recent_records || []).map((record) => ({
+          id: `record-${record.attendance_id}`,
+          date: record.session_date || "",
+          class: record.lecture,
+          status: record.status as AttendanceRecord["status"],
+          timeIn: record.time_in || "-",
+          verificationMethod: record.verification_method === "Manual" ? "manual" : "auto",
+        }));
+        setAttendanceRecords(mapped);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load student data";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Generate attendance records with recent dates
-  const generateRecentRecords = () => {
-    const records: AttendanceRecord[] = [];
-    const today = new Date();
-    const statuses: ("present" | "absent" | "late")[] = ["present", "present", "present", "late", "absent"];
-    
-    // Generate records for the last 30 days (excluding weekends)
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      
-      // Skip weekends
-      const dayOfWeek = date.getDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
-      
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
-      const hour = 9;
-      const minute = Math.floor(Math.random() * 30);
-      
-      records.push({
-        id: `record-${i}`,
-        date: date.toISOString().split("T")[0],
-        class: "Computer Science - 10A",
-        status: status,
-        timeIn: status === "absent" ? "-" : `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} AM`,
-        verificationMethod: Math.random() > 0.2 ? "auto" : "manual",
-      });
-    }
-    
-    return records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  };
+    load();
+  }, [userId]);
 
-  const attendanceRecords: AttendanceRecord[] = generateRecentRecords();
+  const stats = useMemo(() => {
+    const present = dashboard?.attendance.present || 0;
+    const absent = dashboard?.attendance.absent || 0;
+    const late = dashboard?.attendance.late || 0;
+    const unknown = dashboard?.attendance.unknown || 0;
+    const total = present + absent + late + unknown || attendanceRecords.length;
+    return {
+      totalClasses: total,
+      present,
+      absent,
+      late,
+      percentage: dashboard?.attendance.percentage || (total ? Math.round((present / total) * 1000) / 10 : 0),
+    };
+  }, [attendanceRecords.length, dashboard]);
 
-  const stats = {
-    totalClasses: 45,
-    present: 42,
-    absent: 2,
-    late: 1,
-    percentage: 93.3,
-  };
+  const studentName =
+    dashboard?.student?.user?.full_name || dashboard?.student?.full_name || "Student";
+  const rollNumber = dashboard?.student?.roll_number || dashboard?.student?.user?.username || "";
 
   const getStatusBadge = (status: string) => {
     const configs = {
@@ -276,6 +283,15 @@ export function StudentPortal({ onLogout, onNavigateToNotifications }: StudentPo
           </div>
         </div>
       </nav>
+
+      <div className="max-w-7xl mx-auto px-6 py-4 space-y-2">
+        {error && (
+          <Card className="p-4 border-red-200 bg-red-50 text-red-700">{error}</Card>
+        )}
+        {loading && (
+          <Card className="p-4 border-blue-100 bg-blue-50 text-blue-700">Loading your attendance...</Card>
+        )}
+      </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
