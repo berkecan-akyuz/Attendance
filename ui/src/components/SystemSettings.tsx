@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -34,10 +34,11 @@ interface SystemSettingsProps {
   onBack: () => void;
   onLogout?: () => void;
   onNavigateToNotifications?: () => void;
-  onNavigateToDashboard?: () => void;
+  onNavigateToDashboard?: (section?: string) => void;
   onNavigateToReports?: () => void;
   onNavigateToCameras?: () => void;
   userRole?: string;
+  unreadCount?: number;
 }
 
 export function SystemSettings({ 
@@ -47,7 +48,8 @@ export function SystemSettings({
   onNavigateToDashboard,
   onNavigateToReports,
   onNavigateToCameras,
-  userRole = "admin"
+  userRole = "admin",
+  unreadCount = 0
 }: SystemSettingsProps) {
   const [activeSection, setActiveSection] = useState("general");
 
@@ -103,6 +105,12 @@ export function SystemSettings({
     { id: "recognition", label: "Recognition Settings", icon: Eye },
     { id: "notifications", label: "Notification Settings", icon: Bell },
   ];
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+
+  const backgroundClass = theme === "dark" ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900";
 
   const handleSave = () => {
     alert("Settings saved successfully!");
@@ -1133,7 +1141,7 @@ export function SystemSettings({
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className={`min-h-screen ${backgroundClass} flex`}>
       {/* Left Sidebar */}
       <div className="w-64 bg-white border-r border-gray-200 fixed h-screen overflow-y-auto">
         {/* Header */}

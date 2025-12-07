@@ -1,109 +1,39 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "./ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
-import {
-  UserPlus,
-  UserCheck,
-  Camera,
-  AlertTriangle,
-  Clock,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, Bell } from "lucide-react";
+import { fetchNotifications, NotificationItem } from "../lib/api";
 
 interface RecentActivityProps {
   onViewAllActivity?: () => void;
-  onActivityClick?: (activityId: number) => void;
+  onActivityClick?: (activityId: string) => void;
 }
 
 export function RecentActivity({ onViewAllActivity, onActivityClick }: RecentActivityProps) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [activities, setActivities] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const activities = [
-    {
-      id: 1,
-      type: "attendance",
-      user: "John Smith",
-      action: "marked present",
-      time: "5 mins ago",
-      icon: UserCheck,
-      iconBg: "bg-green-100",
-      iconColor: "text-green-600",
-      details: {
-        className: "Computer Science - 10A",
-        location: "Room 101, Building A",
-        method: "Face Recognition",
-        confidence: "98.5%",
-      },
-    },
-    {
-      id: 2,
-      type: "student",
-      user: "Sarah Williams",
-      action: "registered as new student",
-      time: "15 mins ago",
-      icon: UserPlus,
-      iconBg: "bg-blue-100",
-      iconColor: "text-blue-600",
-      details: {
-        className: "Mathematics - 11B",
-        rollNumber: "STU-2024-1235",
-        registeredBy: "Admin User",
-        facesCaptured: "5 samples",
-      },
-    },
-    {
-      id: 3,
-      type: "camera",
-      user: "Camera 03",
-      action: "went offline",
-      time: "1 hour ago",
-      icon: AlertTriangle,
-      iconBg: "bg-red-100",
-      iconColor: "text-red-600",
-      details: {
-        location: "Lab 2, Building B",
-        lastHeartbeat: "60 mins ago",
-        status: "Connection Lost",
-        assignedClass: "Physics Lab - 12A",
-      },
-    },
-    {
-      id: 4,
-      type: "attendance",
-      user: "Mike Johnson",
-      action: "marked present",
-      time: "2 hours ago",
-      icon: UserCheck,
-      iconBg: "bg-green-100",
-      iconColor: "text-green-600",
-      details: {
-        className: "English Literature - 9C",
-        location: "Room 205, Building C",
-        method: "Face Recognition",
-        confidence: "96.2%",
-      },
-    },
-    {
-      id: 5,
-      type: "camera",
-      user: "Camera 02",
-      action: "reconnected",
-      time: "3 hours ago",
-      icon: Camera,
-      iconBg: "bg-purple-100",
-      iconColor: "text-purple-600",
-      details: {
-        location: "Main Hall, Building A",
-        status: "Online",
-        assignedClass: "General Assembly",
-        uptime: "99.2%",
-      },
-    },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      setError(null);
+      setLoading(true);
+      try {
+        const payload = await fetchNotifications();
+        setActivities(payload);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unable to load activity";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const toggleExpand = (id: number) => {
+    load();
+  }, []);
+
+  const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
     onActivityClick?.(id);
   };
@@ -119,26 +49,36 @@ export function RecentActivity({ onViewAllActivity, onActivityClick }: RecentAct
       </div>
 
       <div className="space-y-4">
+        {loading && <p className="text-gray-500">Loading activity...</p>}
+        {error && (
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">{error}</div>
+        )}
+        {!loading && !error && activities.length === 0 && (
+          <p className="text-gray-500">No recent notifications.</p>
+        )}
+
         {activities.map((activity) => {
           const isExpanded = expandedId === activity.id;
-          
+          const severityColors: Record<string, string> = {
+            info: "bg-blue-100 text-blue-700",
+            medium: "bg-amber-100 text-amber-700",
+            high: "bg-red-100 text-red-700",
+          };
+          const color = severityColors[activity.severity] || "bg-gray-100 text-gray-700";
+
           return (
             <div key={activity.id}>
-              <div 
+              <div
                 className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors"
                 onClick={() => toggleExpand(activity.id)}
               >
-                <div
-                  className={`w-10 h-10 ${activity.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}
-                >
-                  <activity.icon className={`w-5 h-5 ${activity.iconColor}`} />
+                <div className={`w-10 h-10 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
+                  <Bell className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-gray-900">
-                    <span className="hover:underline">{activity.user}</span>
-                  </p>
-                  <p className="text-gray-600">{activity.action}</p>
-                  <p className="text-gray-500 mt-1">{activity.time}</p>
+                  <p className="text-gray-900">{activity.title}</p>
+                  <p className="text-gray-600">{activity.message}</p>
+                  <p className="text-gray-500 mt-1">{new Date(activity.timestamp).toLocaleString()}</p>
                 </div>
                 <div className="flex-shrink-0">
                   {isExpanded ? (
@@ -148,18 +88,13 @@ export function RecentActivity({ onViewAllActivity, onActivityClick }: RecentAct
                   )}
                 </div>
               </div>
-              
-              {/* Expanded Details */}
-              {isExpanded && (
-                <div className="ml-13 mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
-                  {Object.entries(activity.details).map(([key, value]) => (
-                    <div key={key} className="flex justify-between text-sm">
-                      <span className="text-gray-600 capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}:
-                      </span>
-                      <span className="text-gray-900">{value}</span>
-                    </div>
-                  ))}
+
+              {isExpanded && activity.message && (
+                <div className="ml-13 mt-2 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>{activity.severity}</span>
+                    <span className="text-gray-500">{activity.type}</span>
+                  </div>
                 </div>
               )}
             </div>
