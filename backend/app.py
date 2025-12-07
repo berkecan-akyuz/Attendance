@@ -859,6 +859,24 @@ def register_routes(app: Flask) -> None:
 
         return jsonify(payload)
 
+    @app.route("/api/lectures/<int:lecture_id>/students/<int:user_id>", methods=["DELETE"])
+    def remove_lecture_student(lecture_id: int, user_id: int):
+        lecture = Lecture.query.get(lecture_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
+
+        enrollment = UserLecture.query.filter_by(
+            lecture_id=lecture_id, user_id=user_id, is_teacher=False
+        ).first()
+
+        if not enrollment:
+            return error_response("Enrollment not found", 404)
+
+        db.session.delete(enrollment)
+        db.session.commit()
+
+        return jsonify({"message": "Student removed from class"})
+
     @app.route("/api/lectures/<int:lecture_id>/attendance-summary", methods=["GET"])
     def lecture_attendance_summary(lecture_id: int):
         lecture = Lecture.query.get(lecture_id)

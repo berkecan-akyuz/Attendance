@@ -43,6 +43,7 @@ import {
   fetchStudents,
   fetchUsers,
   LectureSummary,
+  removeStudentFromLecture,
   UserResponse,
 } from "../lib/api";
 
@@ -395,6 +396,21 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     }
   };
 
+  const handleRemoveStudentFromClass = async (userId: number) => {
+    if (!studentModalClass) return;
+    setStudentModalLoading(true);
+    setStudentModalError(null);
+    try {
+      await removeStudentFromLecture(Number(studentModalClass.id), userId);
+      await loadClassStudents(Number(studentModalClass.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to remove student";
+      setStudentModalError(message);
+    } finally {
+      setStudentModalLoading(false);
+    }
+  };
+
   const refreshClasses = async () => {
     const summaries: LectureSummary[] = await fetchLectureSummaries(
       userRole === "teacher" && teacherUserId ? { teacherUserId } : undefined
@@ -485,7 +501,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 animate-fade-in">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center space-x-4">
@@ -784,11 +800,11 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
       {studentModalOpen && studentModalClass && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <Card className="w-full max-w-5xl max-h-[92vh] overflow-hidden bg-white relative animate-slide-up shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-4 text-white flex items-center justify-between">
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-700 to-blue-700 p-4 text-white flex items-center justify-between shadow-lg">
               <div>
-                <p className="text-xs uppercase tracking-wide opacity-80">Class tools</p>
-                <h3 className="text-xl font-semibold">{studentModalClass.name}</h3>
-                <p className="text-sm text-white/80">Manage roster and attendance with live data</p>
+                <p className="text-xs uppercase tracking-wide text-white/80">Class tools</p>
+                <h3 className="text-xl font-semibold text-white drop-shadow">{studentModalClass.name}</h3>
+                <p className="text-sm text-white/90">Manage roster and attendance with live data</p>
               </div>
               <Button
                 variant="secondary"
@@ -798,7 +814,7 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                   setStudentModalError(null);
                   setStudentModalTab("students");
                 }}
-                className="bg-white/20 hover:bg-white/30 text-white"
+                className="bg-white/15 hover:bg-white/25 text-white border-white/30"
               >
                 Close
               </Button>
@@ -911,9 +927,20 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                               <p className="text-gray-900 font-medium">{student.full_name || "Unnamed"}</p>
                               <p className="text-gray-500 text-sm">{student.email}</p>
                             </div>
-                            <div className="text-right">
-                              <p className="text-sm text-gray-600">Roll: {student.roll_number || "N/A"}</p>
-                              <p className="text-xs text-gray-500">Status: {student.enrollment_status || "Active"}</p>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">Roll: {student.roll_number || "N/A"}</p>
+                                <p className="text-xs text-gray-500">Status: {student.enrollment_status || "Active"}</p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => handleRemoveStudentFromClass(student.user_id)}
+                                disabled={studentModalLoading}
+                              >
+                                Remove
+                              </Button>
                             </div>
                           </div>
                         ))

@@ -426,6 +426,20 @@ export async function fetchLectureStudents(lectureId: number): Promise<any[]> {
   return payload as any[];
 }
 
+export async function removeStudentFromLecture(
+  lectureId: number,
+  userId: number
+): Promise<void> {
+  const response = await fetch(withBase(`/api/lectures/${lectureId}/students/${userId}`), {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const message = (payload && (payload.error as string)) || "Unable to remove student";
+    throw new Error(message);
+  }
+}
+
 export async function fetchLectureAttendanceSummary(
   lectureId: number
 ): Promise<{
