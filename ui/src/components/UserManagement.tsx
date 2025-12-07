@@ -16,7 +16,7 @@ import {
 } from "./ui/table";
 import { AddEditUserModal } from "./AddEditUserModal";
 import { DeleteUserDialog } from "./DeleteUserDialog";
-import { createTeacher, createUser, fetchUsers } from "../lib/api";
+import { createTeacher, createUser, deleteUser, fetchUsers } from "../lib/api";
 import {
   ArrowLeft,
   Search,
@@ -189,9 +189,18 @@ export function UserManagement({ onBack }: UserManagementProps) {
     setEditingUser(null);
   };
 
-  const handleDeleteUser = () => {
-    if (deletingUser) {
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+    setError(null);
+    setIsLoading(true);
+    try {
+      await deleteUser(Number(deletingUser.id));
       setUsers(users.filter((user) => user.id !== deletingUser.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to delete user";
+      setError(message);
+    } finally {
+      setIsLoading(false);
       setDeletingUser(null);
     }
   };

@@ -34,6 +34,7 @@ import {
   assignLectureTeacher,
   CameraResponse,
   createLecture,
+  deleteLecture,
   enrollStudentInLecture,
   fetchAttendanceReports,
   fetchCameras,
@@ -450,6 +451,27 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     setClasses(mapped);
   };
 
+  const handleDeleteClass = async (cls: Class) => {
+    if (!window.confirm("Delete this class? This will unlink students, teachers, and cameras.")) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteLecture(Number(cls.id));
+      setClasses((prev) => prev.filter((c) => c.id !== cls.id));
+      if (studentModalClass?.id === cls.id) {
+        setStudentModalOpen(false);
+        setStudentModalClass(null);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to delete class";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveClass = async (classData: Partial<Class> & { teacherId?: number | null; cameraId?: number | null }) => {
     setLoading(true);
     try {
@@ -746,6 +768,16 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
                       >
                         <Edit className="w-4 h-4 mr-1" />
                         Edit
+                      </Button>
+                    )}
+                    {userRole === "admin" && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleDeleteClass(cls)}
+                      >
+                        Delete
                       </Button>
                     )}
                     <Button

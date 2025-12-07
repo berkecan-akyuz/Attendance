@@ -12,6 +12,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .models import (
     AttendanceSession,
     Camera,
+    FaceDataset,
     Lecture,
     Student,
     StudentAttendance,
@@ -236,6 +237,39 @@ def register_routes(app: Flask) -> None:
         payload["role"] = user.role
         payload["last_login"] = user.last_login.isoformat() if user.last_login else None
         return jsonify(payload)
+
+    @app.route("/api/users/<int:user_id>", methods=["DELETE"])
+    def delete_user(user_id: int):
+        user = User.query.get(user_id)
+        if not user:
+            return error_response("User not found", 404)
+
+        try:
+            if user.student:
+                student_id = user.student.student_id
+                FaceDataset.query.filter_by(student_id=student_id).delete(synchronize_session=False)
+                UserLecture.query.filter_by(user_id=user.user_id).delete(synchronize_session=False)
+                StudentAttendance.query.filter_by(user_id=user.user_id).delete(synchronize_session=False)
+                db.session.delete(user.student)
+
+            if user.teacher:
+                teacher_id = user.teacher.teacher_id
+                Lecture.query.filter_by(teacher_id=teacher_id).update({"teacher_id": None})
+                UserLecture.query.filter_by(user_id=user.user_id, is_teacher=True).delete(
+                    synchronize_session=False
+                )
+                db.session.delete(user.teacher)
+
+            # remove any lingering enrollments and attendance for this user
+            UserLecture.query.filter_by(user_id=user.user_id).delete(synchronize_session=False)
+            StudentAttendance.query.filter_by(user_id=user.user_id).delete(synchronize_session=False)
+
+            db.session.delete(user)
+            db.session.commit()
+            return jsonify({"message": "User deleted"})
+        except Exception as exc:  # pragma: no cover - safety rollback
+            db.session.rollback()
+            return error_response(f"Unable to delete user: {exc}", 500)
 
     @app.route("/api/forgot-password", methods=["POST"])
     def forgot_password():
@@ -709,6 +743,32 @@ def register_routes(app: Flask) -> None:
         payload = lecture.to_dict()
         payload["enrollments"] = [enrollment.to_dict() for enrollment in lecture.enrollments]
         return jsonify(payload)
+
+    @app.route("/api/lectures/<int:lecture_id>", methods=["DELETE"])
+    def delete_lecture(lecture_id: int):
+        lecture = Lecture.query.get(lecture_id)
+        if not lecture:
+            return error_response("Lecture not found", 404)
+
+        try:
+            session_ids = [session.session_id for session in lecture.sessions]
+            if session_ids:
+                StudentAttendance.query.filter(
+                    StudentAttendance.session_id.in_(session_ids)
+                ).delete(synchronize_session=False)
+                AttendanceSession.query.filter(AttendanceSession.session_id.in_(session_ids)).delete(
+                    synchronize_session=False
+                )
+
+            UserLecture.query.filter_by(lecture_id=lecture_id).delete(synchronize_session=False)
+            Camera.query.filter_by(assigned_lecture_id=lecture_id).update({"assigned_lecture_id": None})
+
+            db.session.delete(lecture)
+            db.session.commit()
+            return jsonify({"message": "Lecture deleted"})
+        except Exception as exc:  # pragma: no cover - safety rollback
+            db.session.rollback()
+            return error_response(f"Unable to delete lecture: {exc}", 500)
 
     @app.route("/api/notifications", methods=["GET"])
     def list_notifications():

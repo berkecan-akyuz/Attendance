@@ -179,6 +179,18 @@ export async function createUser(input: CreateUserPayload): Promise<UserResponse
   return payload as UserResponse;
 }
 
+export async function deleteUser(userId: number): Promise<void> {
+  const response = await fetch(withBase(`/api/users/${userId}`), {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const message = (payload && payload.error) || "Unable to delete user";
+    throw new Error(message);
+  }
+}
+
 export async function createStudent(input: {
   user_id: number;
   roll_number: string;
@@ -363,6 +375,18 @@ export async function createLecture(data: Partial<LecturePayload>): Promise<Lect
     throw new Error((payload && payload.error) || "Unable to create class");
   }
   return payload as LecturePayload;
+}
+
+export async function deleteLecture(lectureId: number): Promise<void> {
+  const response = await fetch(withBase(`/api/lectures/${lectureId}`), {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const message = (payload && payload.error) || "Unable to delete class";
+    throw new Error(message);
+  }
 }
 
 export async function assignLectureTeacher(lectureId: number, teacherId: number): Promise<LecturePayload> {
