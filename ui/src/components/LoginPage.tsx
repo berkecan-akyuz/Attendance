@@ -74,7 +74,7 @@ export function LoginPage({ onLogin, onForgotPassword }: LoginPageProps) {
             <div className="space-y-2">
               <Label htmlFor="role">Role (optional)</Label>
               <Select value={role} onValueChange={setRole}>
-                <SelectTrigger id="role" className="w-full">
+                <SelectTrigger id="role" className="w-full" aria-required="true">
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
