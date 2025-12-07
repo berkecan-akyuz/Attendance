@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LoginPage } from "./components/LoginPage";
+import { ForgotPassword } from "./components/ForgotPassword";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { StudentRegistration } from "./components/StudentRegistration";
 import { TeacherAttendance } from "./components/TeacherAttendance";
@@ -9,27 +10,46 @@ import { StudentPortal } from "./components/StudentPortal";
 import { SystemSettings } from "./components/SystemSettings";
 import { LiveMonitoring } from "./components/LiveMonitoring";
 import { NotificationsPanel } from "./components/NotificationsPanel";
+import { AuthPayload } from "./lib/api";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"login" | "dashboard" | "register" | "attendance" | "cameras" | "reports" | "student" | "settings" | "live" | "notifications">("login");
+  const [currentPage, setCurrentPage] = useState<
+    | "login"
+    | "forgot"
+    | "dashboard"
+    | "register"
+    | "attendance"
+    | "cameras"
+    | "reports"
+    | "student"
+    | "settings"
+    | "live"
+    | "notifications"
+  >("login");
   const [userRole, setUserRole] = useState<string>("");
+  const [auth, setAuth] = useState<AuthPayload | null>(null);
 
-  const handleLogin = (role: string) => {
-    setUserRole(role);
+  const handleLogin = (payload: AuthPayload) => {
+    const normalizedRole = payload.role?.toLowerCase() || "";
+    setUserRole(normalizedRole);
+    setAuth(payload);
     // Route based on role
-    if (role === "admin") {
+    if (normalizedRole === "admin") {
       setCurrentPage("dashboard");
-    } else if (role === "teacher") {
+    } else if (normalizedRole === "teacher") {
       setCurrentPage("attendance");
-    } else if (role === "student") {
+    } else if (normalizedRole === "student") {
       setCurrentPage("student");
     }
   };
 
   const handleLogout = () => {
     setUserRole("");
+    setAuth(null);
     setCurrentPage("login");
   };
+
+  const handleNavigateToForgot = () => setCurrentPage("forgot");
 
   const handleNavigateToRegister = () => {
     setCurrentPage("register");
@@ -67,7 +87,12 @@ export default function App() {
 
   return (
     <>
-      {currentPage === "login" && <LoginPage onLogin={handleLogin} />}
+      {currentPage === "login" && (
+        <LoginPage onLogin={handleLogin} onForgotPassword={handleNavigateToForgot} />
+      )}
+      {currentPage === "forgot" && (
+        <ForgotPassword onBack={() => setCurrentPage("login")} />
+      )}
       {currentPage === "dashboard" && userRole === "admin" && (
         <AdminDashboard
           onLogout={handleLogout}
@@ -82,11 +107,12 @@ export default function App() {
         />
       )}
       {currentPage === "register" && (
-        <StudentRegistration onBack={handleBackToDashboard} />
+        <StudentRegistration onBack={handleBackToDashboard} registeredBy={auth?.user_id} />
       )}
       {currentPage === "attendance" && userRole === "teacher" && (
-        <TeacherAttendance 
-          onBack={handleBackToDashboard} 
+        <TeacherAttendance
+          userId={auth?.user_id}
+          onBack={handleBackToDashboard}
           onLogout={handleLogout}
           onNavigateToReports={handleNavigateToReports}
           onNavigateToLive={handleNavigateToLive}
@@ -105,9 +131,10 @@ export default function App() {
         />
       )}
       {currentPage === "reports" && (
-        <ReportsAnalytics 
+        <ReportsAnalytics
           onBack={handleBackToDashboard}
           userRole={userRole as "admin" | "teacher"}
+          userId={auth?.user_id}
           onLogout={handleLogout}
           onNavigateToSettings={handleNavigateToSettings}
           onNavigateToNotifications={handleNavigateToNotifications}
@@ -116,7 +143,8 @@ export default function App() {
         />
       )}
       {currentPage === "student" && userRole === "student" && (
-        <StudentPortal 
+        <StudentPortal
+          userId={auth?.user_id}
           onLogout={handleLogout}
           onNavigateToNotifications={handleNavigateToNotifications}
         />

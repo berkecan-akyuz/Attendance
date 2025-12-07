@@ -2,27 +2,23 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 
 interface ClassComparisonChartProps {
   userRole: "admin" | "teacher";
+  data?: Array<{ class: string; attendance: number }>;
 }
 
-export function ClassComparisonChart({ userRole }: ClassComparisonChartProps) {
-  const adminData = [
-    { class: 'CS 10A', attendance: 96 },
-    { class: 'CS 10B', attendance: 92 },
-    { class: 'Math 11A', attendance: 88 },
-    { class: 'Eng 12A', attendance: 94 },
-    { class: 'Sci 11B', attendance: 90 },
-  ];
+export function ClassComparisonChart({ userRole, data = [] }: ClassComparisonChartProps) {
+  if (!data.length) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-gray-500 border border-dashed rounded-lg bg-white">
+        No class comparison data available
+      </div>
+    );
+  }
 
-  const teacherData = [
-    { class: 'CS 10A', attendance: 96 },
-    { class: 'CS 10B', attendance: 92 },
-  ];
-
-  const data = userRole === "admin" ? adminData : teacherData;
+  const chartData = data;
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data}>
+      <BarChart data={chartData}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
         <XAxis 
           dataKey="class" 
