@@ -241,6 +241,18 @@ export function CameraManagement({
       )}
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-gray-900">Camera Management</h1>
+              <p className="text-gray-500">Configure cameras and class assignments</p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Button
