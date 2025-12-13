@@ -20,12 +20,14 @@ interface CameraData {
   status: "online" | "offline";
   lastHeartbeat: string;
   assignedClass: string;
+  assignedLectureId: number | null;
 }
 
 interface CameraConfigModalProps {
   camera: CameraData;
   isNew: boolean;
   onSave: (camera: CameraData) => void;
+  classOptions: Array<{ id: number; name: string; room?: string }>;
   onClose: () => void;
 }
 
@@ -33,12 +35,13 @@ export function CameraConfigModal({
   camera,
   isNew,
   onSave,
+  classOptions,
   onClose,
 }: CameraConfigModalProps) {
   const [formData, setFormData] = useState<CameraData>(camera);
   const [isTesting, setIsTesting] = useState(false);
 
-  const handleChange = (field: keyof CameraData, value: string) => {
+  const handleChange = <K extends keyof CameraData>(field: K, value: CameraData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -135,24 +138,30 @@ export function CameraConfigModal({
               <div className="space-y-2">
                 <Label htmlFor="assignedClass">Assigned Class</Label>
                 <Select
-                  value={formData.assignedClass}
-                  onValueChange={(value) => handleChange("assignedClass", value)}
+                  value={formData.assignedLectureId ? String(formData.assignedLectureId) : "unassigned"}
+                  onValueChange={(value) => {
+                    if (value === "unassigned") {
+                      handleChange("assignedLectureId", null);
+                      handleChange("assignedClass", "Unassigned");
+                      return;
+                    }
+                    const lectureId = Number(value);
+                    const selectedClass = classOptions.find((cls) => cls.id === lectureId);
+                    handleChange("assignedLectureId", lectureId);
+                    handleChange("assignedClass", selectedClass?.name || formData.assignedClass);
+                  }}
                 >
                   <SelectTrigger id="assignedClass">
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Unassigned">Unassigned</SelectItem>
-                    <SelectItem value="Computer Science - 10A">
-                      Computer Science - 10A
-                    </SelectItem>
-                    <SelectItem value="Computer Science - 10B">
-                      Computer Science - 10B
-                    </SelectItem>
-                    <SelectItem value="Mathematics - 11A">
-                      Mathematics - 11A
-                    </SelectItem>
-                    <SelectItem value="English - 12A">English - 12A</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {classOptions.map((cls) => (
+                      <SelectItem key={cls.id} value={String(cls.id)}>
+                        {cls.name}
+                        {cls.room ? ` — ${cls.room}` : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

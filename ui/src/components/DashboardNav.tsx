@@ -12,17 +12,27 @@ import { ScanFace, LogOut, User, Settings } from "lucide-react";
 import { Bell } from "lucide-react";
 import { Badge } from "./ui/badge";
 
-  interface DashboardNavProps {
-    currentPage: string;
-    onPageChange: (page: string) => void;
-    onLogout: () => void;
-    userRole: string;
-    onNavigateToSettings?: () => void;
-    onNavigateToNotifications?: () => void;
-    unreadCount?: number;
-  }
+interface DashboardNavProps {
+  currentPage: string;
+  onPageChange: (page: string) => void;
+  onLogout: () => void;
+  userRole: string;
+  onNavigateToSettings?: () => void;
+  onNavigateToNotifications?: () => void;
+  unreadCount?: number;
+  onProfileClick?: (tab?: "profile" | "security" | "preferences") => void;
+}
 
-  export function DashboardNav({ currentPage, onPageChange, onLogout, userRole, onNavigateToSettings, onNavigateToNotifications, unreadCount = 0 }: DashboardNavProps) {
+export function DashboardNav({
+  currentPage,
+  onPageChange,
+  onLogout,
+  userRole,
+  onNavigateToSettings,
+  onNavigateToNotifications,
+  unreadCount = 0,
+  onProfileClick,
+}: DashboardNavProps) {
   // Define navigation items based on role
   const getNavItems = () => {
     if (userRole === "admin") {
@@ -69,7 +79,7 @@ import { Badge } from "./ui/badge";
             <div className="hidden md:flex items-center space-x-1">
               {navItems.map((item) => {
                 const isActive = currentPage === item.id;
-                
+
                 return (
                   <button
                     key={item.id}
@@ -133,13 +143,11 @@ import { Badge } from "./ui/badge";
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onProfileClick?.("profile")}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={onNavigateToSettings}
-                >
+                <DropdownMenuItem onClick={() => onProfileClick?.("security")}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
