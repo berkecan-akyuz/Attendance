@@ -1099,9 +1099,6 @@ def register_routes(app: Flask) -> None:
             lecture_id = camera.assigned_lecture_id
             if lecture_id:
                 camera.assigned_lecture_id = None
-                Lecture.query.filter_by(lecture_id=lecture_id, camera_id=camera_id).update(
-                    {"camera_id": None}
-                )
 
             db.session.delete(camera)
             db.session.commit()

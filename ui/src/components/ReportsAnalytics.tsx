@@ -23,6 +23,7 @@ import { AttendanceTrendChart } from "./charts/AttendanceTrendChart";
 import { ClassComparisonChart } from "./charts/ClassComparisonChart";
 import { StatusDistributionChart } from "./charts/StatusDistributionChart";
 import { AttendanceHeatMap } from "./charts/AttendanceHeatMap";
+import { ProfileSettingsModal } from "./ProfileSettingsModal";
 import { 
   Download, 
   ArrowLeft,
@@ -75,8 +76,10 @@ export function ReportsAnalytics({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [dateRange, setDateRange] = useState("last30");
-
-  
+  const [profileModal, setProfileModal] = useState<{
+    open: boolean;
+    tab: "profile" | "security" | "preferences";
+  }>({ open: false, tab: "profile" });
   const [reports, setReports] = useState<AttendanceReports | null>(null);
   const [classes, setClasses] = useState<LectureSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -252,21 +255,36 @@ export function ReportsAnalytics({
           onNavigateToSettings={onNavigateToSettings}
           onNavigateToNotifications={onNavigateToNotifications}
           unreadCount={unreadCount}
+          onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
         />
       )}
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role={userRole}
+        userName={userRole === "teacher" ? "Teacher" : "Admin User"}
+        email={userRole === "teacher" ? "teacher@attendance.com" : "admin@attendance.com"}
+        defaultTab={profileModal.tab}
+      />
 
       {/* Page Header with Export */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-gray-900">Reports & Analytics</h1>
-            <p className="text-gray-500">
-              {userRole === "admin" 
-                ? "View comprehensive attendance analytics"
-                : "View your class attendance reports"}
-            </p>
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-gray-900">Reports & Analytics</h1>
+              <p className="text-gray-500">
+                {userRole === "admin"
+                  ? "View comprehensive attendance analytics"
+                  : "View your class attendance reports"}
+              </p>
+            </div>
           </div>
-          
+
           {/* Export Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

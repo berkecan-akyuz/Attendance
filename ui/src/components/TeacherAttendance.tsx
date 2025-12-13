@@ -31,6 +31,7 @@ import {
 import { EditAttendanceModal } from "./EditAttendanceModal";
 import { ClassManagement } from "./ClassManagement";
 import { fetchTeacherStats, fetchTeacherStudents } from "../lib/api";
+import { ProfileSettingsModal } from "./ProfileSettingsModal";
 import {
   ScanFace,
   Users,
@@ -78,6 +79,10 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
   const [quickFilter, setQuickFilter] = useState("today");
   const [editingStudent, setEditingStudent] = useState<AttendanceRecord | null>(null);
   const [isLocked, setIsLocked] = useState(false);
+  const [profileModal, setProfileModal] = useState<{
+    open: boolean;
+    tab: "profile" | "security" | "preferences";
+  }>({ open: false, tab: "profile" });
 
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [classOptions, setClassOptions] = useState<string[]>([]);
@@ -309,11 +314,11 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setProfileModal({ open: true, tab: "profile" })}>
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setProfileModal({ open: true, tab: "security" })}>
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Settings</span>
                     </DropdownMenuItem>
@@ -334,6 +339,15 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
           </div>
         </div>
       </nav>
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role="teacher"
+        userName="Teacher User"
+        email="teacher@attendance.com"
+        defaultTab={profileModal.tab}
+      />
 
       {/* Page Title */}
       <div className="bg-white border-b border-gray-200 px-6 py-6">
@@ -540,6 +554,15 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
           onClose={() => setEditingStudent(null)}
         />
       )}
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role="teacher"
+        userName="Teacher User"
+        email="teacher@attendance.com"
+        defaultTab={profileModal.tab}
+      />
     </div>
   );
 }
