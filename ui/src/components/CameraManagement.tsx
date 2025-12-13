@@ -4,6 +4,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { CameraConfigModal } from "./CameraConfigModal";
 import { DashboardNav } from "./DashboardNav";
+import { ProfileSettingsModal } from "./ProfileSettingsModal";
 import {
   Camera,
   Settings,
@@ -58,6 +59,10 @@ export function CameraManagement({
   const [activeFilter, setActiveFilter] = useState<"all" | "online" | "offline" | "unassigned">("all");
   const [editingCamera, setEditingCamera] = useState<CameraData | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [profileModal, setProfileModal] = useState<{
+    open: boolean;
+    tab: "profile" | "security" | "preferences";
+  }>({ open: false, tab: "profile" });
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
   const [cameras, setCameras] = useState<CameraData[]>([]);
   const [classOptions, setClassOptions] = useState<
@@ -237,8 +242,18 @@ export function CameraManagement({
           onNavigateToSettings={onNavigateToSettings}
           onNavigateToNotifications={onNavigateToNotifications}
           unreadCount={unreadCount}
+          onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
         />
       )}
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role="admin"
+        userName="Admin User"
+        email="admin@attendance.com"
+        defaultTab={profileModal.tab}
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">

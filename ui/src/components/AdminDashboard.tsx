@@ -7,6 +7,7 @@ import { AttendanceOverview } from "./AttendanceOverview";
 import { UserManagement } from "./UserManagement";
 import { ClassManagement } from "./ClassManagement";
 import { fetchOverviewStats, OverviewStats } from "../lib/api";
+import { ProfileSettingsModal } from "./ProfileSettingsModal";
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -40,6 +41,10 @@ export function AdminDashboard({
   const [currentPage, setCurrentPage] = useState(activeSection || "Dashboard");
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [profileModal, setProfileModal] = useState<{
+    open: boolean;
+    tab: "profile" | "security" | "preferences";
+  }>({ open: false, tab: "profile" });
 
   useEffect(() => {
     if (activeSection && activeSection !== currentPage) {
@@ -97,6 +102,16 @@ export function AdminDashboard({
         onNavigateToSettings={onNavigateToSettings}
         onNavigateToNotifications={onNavigateToNotifications}
         unreadCount={unreadCount}
+        onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
+      />
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role="admin"
+        userName="Admin User"
+        email="admin@attendance.com"
+        defaultTab={profileModal.tab}
       />
 
       {/* Main Content */}

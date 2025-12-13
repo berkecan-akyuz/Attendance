@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { DashboardNav } from "./DashboardNav";
+import { ProfileSettingsModal } from "./ProfileSettingsModal";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   Settings,
   Clock,
@@ -52,6 +54,10 @@ export function SystemSettings({
   unreadCount = 0
 }: SystemSettingsProps) {
   const [activeSection, setActiveSection] = useState("general");
+  const [profileModal, setProfileModal] = useState<{
+    open: boolean;
+    tab: "profile" | "security" | "preferences";
+  }>({ open: false, tab: "profile" });
 
   // General Settings State
   const [systemName, setSystemName] = useState("Face Recognition Attendance System");
@@ -1178,6 +1184,18 @@ export function SystemSettings({
 
       {/* Main Content Area */}
       <div className="ml-64 flex-1 p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-gray-900">System Settings</h1>
+            <p className="text-gray-500">Adjust platform preferences and your personal admin profile.</p>
+          </div>
+          <Button variant="ghost" className="p-0" onClick={() => setProfileModal({ open: true, tab: "profile" })}>
+            <Avatar className="h-10 w-10">
+              <AvatarImage src="" alt="Admin" />
+              <AvatarFallback className="bg-blue-100 text-blue-600">AD</AvatarFallback>
+            </Avatar>
+          </Button>
+        </div>
         <div className="max-w-5xl">
           {activeSection === "general" && renderGeneralSettings()}
           {activeSection === "attendance" && renderAttendanceRules()}
@@ -1186,6 +1204,15 @@ export function SystemSettings({
             renderPlaceholderSection("Notification Settings")}
         </div>
       </div>
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role={userRole as "admin"}
+        userName="Admin User"
+        email="admin@attendance.com"
+        defaultTab={profileModal.tab}
+      />
     </div>
   );
 }
