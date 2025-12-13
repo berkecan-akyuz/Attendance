@@ -39,6 +39,7 @@ import {
   Bell,
 } from "lucide-react";
 import { fetchStudentDashboard, StudentDashboard } from "../lib/api";
+import { ProfileSettingsModal } from "./ProfileSettingsModal";
 
 interface AttendanceRecord {
   id: string;
@@ -64,6 +65,10 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profileModal, setProfileModal] = useState<{
+    open: boolean;
+    tab: "profile" | "security" | "preferences";
+  }>({ open: false, tab: "profile" });
 
   useEffect(() => {
     const load = async () => {
@@ -260,11 +265,21 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setProfileModal({ open: true, tab: "profile" });
+                    }}
+                  >
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setProfileModal({ open: true, tab: "security" });
+                    }}
+                  >
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
@@ -283,6 +298,16 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
           </div>
         </div>
       </nav>
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role="student"
+        userName={studentName}
+        email={dashboard?.student?.user?.email || "student@attendance.com"}
+        identifier={rollNumber}
+        defaultTab={profileModal.tab}
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-4 space-y-2">
         {error && (
