@@ -15,7 +15,6 @@ import {
 } from "./ui/select";
 import { DashboardNav } from "./DashboardNav";
 import { ProfileSettingsModal } from "./ProfileSettingsModal";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   Settings,
   Clock,
@@ -43,13 +42,13 @@ interface SystemSettingsProps {
   unreadCount?: number;
 }
 
-export function SystemSettings({ 
+export function SystemSettings({
   onBack,
-  onLogout,
-  onNavigateToNotifications,
-  onNavigateToDashboard,
-  onNavigateToReports,
-  onNavigateToCameras,
+  onLogout = () => {},
+  onNavigateToNotifications = () => {},
+  onNavigateToDashboard = () => {},
+  onNavigateToReports = () => {},
+  onNavigateToCameras = () => {},
   userRole = "admin",
   unreadCount = 0
 }: SystemSettingsProps) {
@@ -1146,62 +1145,79 @@ export function SystemSettings({
     </div>
   );
 
+  const handlePageChange = (page: string) => {
+    if (page === "Dashboard" && onNavigateToDashboard) {
+      onNavigateToDashboard();
+    } else if (page === "Reports" && onNavigateToReports) {
+      onNavigateToReports();
+    } else if (page === "Cameras" && onNavigateToCameras) {
+      onNavigateToCameras();
+    }
+    // Settings is already the active page
+  };
+
   return (
-    <div className={`min-h-screen ${backgroundClass} flex`}>
-      {/* Left Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 fixed h-screen overflow-y-auto">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <Button variant="ghost" size="icon" onClick={onBack} className="mb-4">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h2 className="text-gray-900">Settings</h2>
-        </div>
+    <div className={`min-h-screen ${backgroundClass} flex flex-col`}>
+      <DashboardNav
+        currentPage="Settings"
+        onPageChange={handlePageChange}
+        onLogout={onLogout}
+        userRole={userRole}
+        onNavigateToNotifications={onNavigateToNotifications}
+        unreadCount={unreadCount}
+        onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
+      />
 
-        {/* Menu Items */}
-        <nav className="p-4 space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                  isActive
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className={isActive ? "" : ""}>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="ml-64 flex-1 p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-gray-900">System Settings</h1>
-            <p className="text-gray-500">Adjust platform preferences and your personal admin profile.</p>
+      <div className="flex flex-1">
+        {/* Left Sidebar */}
+        <div className="w-64 bg-white border-r border-gray-200 h-full overflow-y-auto">
+          {/* Header */}
+          <div className="p-6 border-b border-gray-200">
+            <Button variant="ghost" size="icon" onClick={onBack} className="mb-4">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h2 className="text-gray-900">Settings</h2>
           </div>
-          <Button variant="ghost" className="p-0" onClick={() => setProfileModal({ open: true, tab: "profile" })}>
-            <Avatar className="h-10 w-10">
-              <AvatarImage src="" alt="Admin" />
-              <AvatarFallback className="bg-blue-100 text-blue-600">AD</AvatarFallback>
-            </Avatar>
-          </Button>
+
+          {/* Menu Items */}
+          <nav className="p-4 space-y-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className={isActive ? "" : ""}>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
-        <div className="max-w-5xl">
-          {activeSection === "general" && renderGeneralSettings()}
-          {activeSection === "attendance" && renderAttendanceRules()}
-          {activeSection === "recognition" && renderRecognitionSettings()}
-          {activeSection === "notifications" &&
-            renderPlaceholderSection("Notification Settings")}
+
+        {/* Main Content Area */}
+        <div className="flex-1 p-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-gray-900">System Settings</h1>
+              <p className="text-gray-500">Adjust platform preferences and your personal admin profile.</p>
+            </div>
+          </div>
+          <div className="max-w-5xl">
+            {activeSection === "general" && renderGeneralSettings()}
+            {activeSection === "attendance" && renderAttendanceRules()}
+            {activeSection === "recognition" && renderRecognitionSettings()}
+            {activeSection === "notifications" &&
+              renderPlaceholderSection("Notification Settings")}
+          </div>
         </div>
       </div>
 
