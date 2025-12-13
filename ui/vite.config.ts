@@ -47,37 +47,23 @@ export default defineConfig({
       '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
       '@': path.resolve(__dirname, './src'),
     },
-  }, // <--- THIS CLOSING BRACE WAS MISSING/MISPLACED IN YOUR VERSION
+  },
 
-  // These blocks must be siblings of 'resolve', not children
   build: {
     target: 'esnext',
     outDir: 'build',
   },
+
   server: {
     port: 3000,
     host: true,
     open: true,
     proxy: {
       "/api": {
-        // Recommend using 127.0.0.1 explicitly to avoid Node/Flask ipv4/ipv6 conflicts
+        // Keeping the 127.0.0.1 version as it is safer for Flask/Node setups
         target: process.env.VITE_BACKEND_URL || "http://127.0.0.1:5000",
         changeOrigin: true,
       },
     },
-    build: {
-      target: 'esnext',
-      outDir: 'build',
-    },
-    server: {
-      port: 3000,
-      host: true,
-      open: true,
-      proxy: {
-        "/api": {
-          target: process.env.VITE_BACKEND_URL || "http://localhost:5000",
-          changeOrigin: true,
-        },
-      },
-    },
-  });
+  },
+});
