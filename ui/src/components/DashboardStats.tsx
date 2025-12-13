@@ -9,10 +9,13 @@ interface DashboardStatsProps {
   stats?: OverviewStats | null;
 }
 
+const warnMissingHandler = (destination: string) => () =>
+  console.warn(`DashboardStats navigation is not wired: ${destination}`);
+
 export function DashboardStats({
-  onNavigateToUsers,
-  onNavigateToCameras,
-  onNavigateToReports,
+  onNavigateToUsers = warnMissingHandler("users"),
+  onNavigateToCameras = warnMissingHandler("cameras"),
+  onNavigateToReports = warnMissingHandler("reports"),
   stats,
 }: DashboardStatsProps) {
   const cards = [
@@ -25,7 +28,7 @@ export function DashboardStats({
       iconBg: "bg-blue-100",
       iconColor: "text-blue-600",
       trend: "up",
-      onClick: () => onNavigateToUsers?.("students"),
+      onClick: () => onNavigateToUsers("students"),
     },
     {
       id: "teachers",
@@ -36,7 +39,7 @@ export function DashboardStats({
       iconBg: "bg-green-100",
       iconColor: "text-green-600",
       trend: "neutral",
-      onClick: () => onNavigateToUsers?.("teachers"),
+      onClick: () => onNavigateToUsers("teachers"),
     },
     {
       id: "lectures",
@@ -47,7 +50,7 @@ export function DashboardStats({
       iconBg: "bg-purple-100",
       iconColor: "text-purple-600",
       trend: "neutral",
-      onClick: () => onNavigateToCameras?.(),
+      onClick: () => onNavigateToCameras(),
     },
     {
       id: "enrollments",
@@ -58,7 +61,7 @@ export function DashboardStats({
       iconBg: "bg-orange-100",
       iconColor: "text-orange-600",
       trend: "up",
-      onClick: () => onNavigateToReports?.("average"),
+      onClick: () => onNavigateToReports("average"),
     },
   ];
 
