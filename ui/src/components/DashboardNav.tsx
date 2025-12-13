@@ -144,8 +144,7 @@ export function DashboardNav({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault();
+                  onSelect={() => {
                     onProfileClick("profile");
                   }}
                 >
@@ -153,8 +152,7 @@ export function DashboardNav({
                   <span>Profile</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault();
+                  onSelect={() => {
                     onProfileClick("security");
                   }}
                 >
