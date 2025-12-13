@@ -554,6 +554,15 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
           onClose={() => setEditingStudent(null)}
         />
       )}
+
+      <ProfileSettingsModal
+        open={profileModal.open}
+        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
+        role="teacher"
+        userName="Teacher User"
+        email="teacher@attendance.com"
+        defaultTab={profileModal.tab}
+      />
     </div>
   );
 }
