@@ -153,12 +153,15 @@ export function AdminDashboard({
 
       {/* User Management Page */}
       {currentPage === "Users" && (
-        <UserManagement onBack={() => setCurrentPage("Dashboard")} />
+        <UserManagement onBack={() => handlePageChange("Dashboard")} />
       )}
 
       {/* Class Management Page */}
       {currentPage === "Classes" && (
-        <ClassManagement onBack={() => setCurrentPage("Dashboard")} userRole="admin" />
+        <ClassManagement
+          onBack={() => handlePageChange("Dashboard")}
+          userRole="admin"
+        />
       )}
 
       {/* Other pages placeholder */}
