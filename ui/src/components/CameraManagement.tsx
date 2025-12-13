@@ -4,9 +4,9 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { CameraConfigModal } from "./CameraConfigModal";
 import { DashboardNav } from "./DashboardNav";
-import { 
-  Camera, 
-  Settings, 
+import {
+  Camera,
+  Settings,
   Trash2, 
   Plus,
   Wifi,
@@ -19,6 +19,7 @@ import {
   createCamera,
   updateCamera,
   deleteCamera,
+  fetchLectureSummaries,
 } from "../lib/api";
 
 interface CameraData {
@@ -30,6 +31,7 @@ interface CameraData {
   status: "online" | "offline";
   lastHeartbeat: string;
   assignedClass: string;
+  assignedLectureId: number | null;
 }
 
 interface CameraManagementProps {
@@ -58,6 +60,9 @@ export function CameraManagement({
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
   const [cameras, setCameras] = useState<CameraData[]>([]);
+  const [classOptions, setClassOptions] = useState<
+    Array<{ id: number; name: string; room?: string }>
+  >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -67,8 +72,16 @@ export function CameraManagement({
       setLoading(true);
       setError(null);
       try {
-        const payload: CameraResponse[] = await fetchCameras();
-        const mapped: CameraData[] = payload.map((cam) => ({
+        const [cameraPayload, lecturePayload] = await Promise.all([
+          fetchCameras(),
+          fetchLectureSummaries(),
+        ]);
+
+        const lectureNameById = new Map(
+          lecturePayload.map((lecture) => [lecture.lecture_id, lecture.lecture_name])
+        );
+
+        const mapped: CameraData[] = cameraPayload.map((cam) => ({
           id: `CAM-${String(cam.camera_id).padStart(3, "0")}`,
           name: cam.camera_name,
           location: cam.location,
@@ -76,8 +89,21 @@ export function CameraManagement({
           ipAddress: cam.stream_url.replace("rtsp://", "").split(":")[0] || "",
           status: (cam.status || "online").toLowerCase() as CameraData["status"],
           lastHeartbeat: cam.last_checked || "",
-          assignedClass: cam.lecture_name || "Unassigned",
+          assignedClass:
+            cam.lecture_name ||
+            (cam.assigned_lecture_id
+              ? lectureNameById.get(cam.assigned_lecture_id) || "Assigned"
+              : "Unassigned"),
+          assignedLectureId: cam.assigned_lecture_id || null,
         }));
+
+        setClassOptions(
+          lecturePayload.map((lecture) => ({
+            id: lecture.lecture_id,
+            name: lecture.lecture_name,
+            room: lecture.room_number,
+          }))
+        );
         setCameras(mapped);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unable to load cameras";
@@ -132,14 +158,18 @@ export function CameraManagement({
           location: cameraData.location,
           stream_url: cameraData.streamUrl,
           status: cameraData.status,
-          assigned_lecture_id: null,
+          assigned_lecture_id: cameraData.assignedLectureId,
         });
         setCameras([
           ...cameras,
           {
             ...cameraData,
             id: `CAM-${String(created.camera_id).padStart(3, "0")}`,
-            assignedClass: created.lecture_name || "Unassigned",
+            assignedClass:
+              created.lecture_name ||
+              classOptions.find((cls) => cls.id === cameraData.assignedLectureId)?.name ||
+              "Unassigned",
+            assignedLectureId: cameraData.assignedLectureId || null,
           },
         ]);
       } else {
@@ -148,13 +178,18 @@ export function CameraManagement({
           location: cameraData.location,
           stream_url: cameraData.streamUrl,
           status: cameraData.status,
+          assigned_lecture_id: cameraData.assignedLectureId,
         });
         setCameras(
           cameras.map((cam) =>
             cam.id === cameraData.id
               ? {
                   ...cameraData,
-                  assignedClass: updated.lecture_name || cameraData.assignedClass,
+                  assignedClass:
+                    updated.lecture_name ||
+                    classOptions.find((cls) => cls.id === cameraData.assignedLectureId)?.name ||
+                    cameraData.assignedClass,
+                  assignedLectureId: cameraData.assignedLectureId || null,
                 }
               : cam
           )
@@ -220,6 +255,7 @@ export function CameraManagement({
                   status: "offline",
                   lastHeartbeat: "Just now",
                   assignedClass: "Unassigned",
+                  assignedLectureId: null,
                 });
                 setIsAddingNew(true);
               }}
@@ -395,6 +431,7 @@ export function CameraManagement({
         <CameraConfigModal
           camera={editingCamera}
           isNew={isAddingNew}
+          classOptions={classOptions}
           onSave={handleSaveCamera}
           onClose={() => {
             setEditingCamera(null);
