@@ -58,3 +58,11 @@ All endpoints accept and return JSON.
 - Passwords are stored as hashes via `werkzeug.security.generate_password_hash`.
 - Relationships enforce that students/teachers must be linked to users with the matching role.
 - Enrollment uniqueness is enforced per user per lecture (matching `User_Lecture` primary key in `ATTENDANCE.sql`).
+
+## Manual Verification
+
+Use the following smoke test to confirm camera deletion works even when the camera was previously assigned to a lecture:
+
+1. Create or identify a lecture and a camera, then update the camera to set `assigned_lecture_id` to the lecture's ID.
+2. Issue `DELETE /api/cameras/<camera_id>`.
+3. Expect a `200` response with `{ "message": "Camera deleted" }` and verify the database no longer contains the camera record.
