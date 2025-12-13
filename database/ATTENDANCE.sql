@@ -257,3 +257,10 @@ CREATE INDEX idx_correction_status ON Attendance_Correction_Request(status);
 CREATE INDEX idx_correction_reviewed ON Attendance_Correction_Request(reviewed_by);
 
 GO
+
+CREATE TABLE Department (
+    department_id INT IDENTITY(1,1) PRIMARY KEY,
+    name VARCHAR(150) UNIQUE NOT NULL,
+    code VARCHAR(50) NULL,
+    created_at DATETIME DEFAULT GETDATE()
+);
