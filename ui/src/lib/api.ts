@@ -33,6 +33,12 @@ export interface OverviewStats {
   total_enrollments: number;
 }
 
+export interface Department {
+  department_id: number;
+  name: string;
+  code?: string;
+}
+
 export interface TeacherStats {
   teacher_id: number;
   classes: number;
@@ -136,6 +142,32 @@ export interface LecturePayload {
   camera?: CameraResponse | null;
 }
 
+export async function fetchDepartments(): Promise<Department[]> {
+  const response = await fetch(withBase("/api/departments"));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    const message = (payload && (payload.error as string)) || "Unable to load departments";
+    throw new Error(message);
+  }
+  return payload as Department[];
+}
+
+export async function createDepartment(input: { name: string; code?: string }): Promise<Department> {
+  const response = await fetch(withBase("/api/departments"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = (payload && payload.error) || "Unable to save department";
+    throw new Error(message);
+  }
+
+  return payload as Department;
+}
+
 export async function loginUser(email: string, password: string, role?: string): Promise<AuthPayload> {
   const response = await fetch(withBase("/api/login"), {
     method: "POST",
@@ -195,6 +227,7 @@ export async function createStudent(input: {
   user_id: number;
   roll_number: string;
   department?: string;
+  department_id?: string;
   face_embeddings: string;
   face_image_path?: string;
   registered_by?: number;

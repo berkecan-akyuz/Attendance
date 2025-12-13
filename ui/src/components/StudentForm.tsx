@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import type { Department } from "../lib/api";
 
 interface StudentFormProps {
   formData: {
@@ -18,10 +19,17 @@ interface StudentFormProps {
     dateOfBirth: string;
     password: string;
   };
+  departments: Department[];
+  departmentsLoading?: boolean;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-export function StudentForm({ formData, setFormData }: StudentFormProps) {
+export function StudentForm({
+  formData,
+  setFormData,
+  departments,
+  departmentsLoading,
+}: StudentFormProps) {
   const handleChange = (field: string, value: string) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
@@ -72,16 +80,28 @@ export function StudentForm({ formData, setFormData }: StudentFormProps) {
           <Select
             value={formData.department}
             onValueChange={(value) => handleChange("department", value)}
+            disabled={departmentsLoading}
           >
             <SelectTrigger id="department">
-              <SelectValue placeholder="Select department" />
+              <SelectValue placeholder={
+                departmentsLoading
+                  ? "Loading departments..."
+                  : departments.length
+                  ? "Select department"
+                  : "No departments available"
+              } />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="science">Science</SelectItem>
-              <SelectItem value="commerce">Commerce</SelectItem>
-              <SelectItem value="arts">Arts</SelectItem>
-              <SelectItem value="engineering">Engineering</SelectItem>
-              <SelectItem value="medical">Medical</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept.department_id} value={String(dept.department_id)}>
+                  {dept.name}
+                </SelectItem>
+              ))}
+              {!departments.length && (
+                <SelectItem value="no-departments" disabled>
+                  No departments found
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>

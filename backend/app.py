@@ -12,6 +12,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .models import (
     AttendanceSession,
     Camera,
+    Department,
     FaceDataset,
     Lecture,
     Student,
@@ -162,6 +163,20 @@ def coerce_int(value):
         return None
 
 
+def resolve_department_name(department_id, department_value):
+    dept_id = coerce_int(department_id)
+    if dept_id is not None:
+        department = Department.query.get(dept_id)
+        if not department:
+            return None, error_response("Department not found", 404)
+        return department.name, None
+
+    if department_value:
+        return department_value, None
+
+    return None, None
+
+
 def register_routes(app: Flask) -> None:
     @app.route("/api/health", methods=["GET"])
     def health_check():
@@ -179,6 +194,26 @@ def register_routes(app: Flask) -> None:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
+
+    @app.route("/api/departments", methods=["GET", "POST"])
+    def departments():
+        if request.method == "GET":
+            departments = Department.query.order_by(Department.name.asc()).all()
+            return jsonify([dept.to_dict() for dept in departments])
+
+        data = request.get_json() or {}
+        name = (data.get("name") or "").strip()
+        if not name:
+            return error_response("Department name is required")
+
+        existing = Department.query.filter(func.lower(Department.name) == name.lower()).first()
+        if existing:
+            return error_response("Department already exists", 409)
+
+        dept = Department(name=name, code=data.get("code"))
+        db.session.add(dept)
+        db.session.commit()
+        return jsonify(dept.to_dict()), 201
 
     @app.route("/api/users", methods=["POST"])
     def create_user():
@@ -314,10 +349,16 @@ def register_routes(app: Flask) -> None:
         if Student.query.filter_by(roll_number=roll_number).first():
             return error_response("Roll number already exists", 409)
 
+        department_name, dept_error = resolve_department_name(
+            data.get("department_id"), data.get("department")
+        )
+        if dept_error:
+            return dept_error
+
         student = Student(
             user_id=user_id,
             roll_number=roll_number,
-            department=data.get("department"),
+            department=department_name,
             registered_by=data.get("registered_by"),
             face_embeddings=face_embeddings,
             face_image_path=data.get("face_image_path"),
@@ -689,9 +730,15 @@ def register_routes(app: Flask) -> None:
         if Teacher.query.filter_by(user_id=user_id).first():
             return error_response("Teacher profile already exists for this user", 409)
 
+        department_name, dept_error = resolve_department_name(
+            data.get("department_id"), data.get("department")
+        )
+        if dept_error:
+            return dept_error
+
         teacher = Teacher(
             user_id=user_id,
-            department=data.get("department"),
+            department=department_name,
             specialization=data.get("specialization"),
         )
         db.session.add(teacher)
@@ -713,10 +760,15 @@ def register_routes(app: Flask) -> None:
 
         teacher_id = coerce_int(data.get("teacher_id"))
         teacher = Teacher.query.get(teacher_id) if teacher_id else None
+        department_name, dept_error = resolve_department_name(
+            data.get("department_id"), data.get("department")
+        )
+        if dept_error:
+            return dept_error
         lecture = Lecture(
             lecture_name=lecture_name,
             course_code=data.get("course_code"),
-            department=data.get("department"),
+            department=department_name,
             semester=coerce_semester(data.get("semester")),
             year=coerce_int(data.get("year")),
             schedule=data.get("schedule"),

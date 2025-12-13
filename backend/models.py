@@ -10,6 +10,23 @@ from sqlalchemy import UniqueConstraint
 db = SQLAlchemy()
 
 
+class Department(db.Model):
+    __tablename__ = "Department"
+
+    department_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), unique=True, nullable=False)
+    code = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            "department_id": self.department_id,
+            "name": self.name,
+            "code": self.code,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class User(db.Model):
     __tablename__ = "User"
 

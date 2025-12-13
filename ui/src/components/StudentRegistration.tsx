@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StudentForm } from "./StudentForm";
 import { FaceCapture } from "./FaceCapture";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { ArrowLeft } from "lucide-react";
-import { createStudent, createUser } from "../lib/api";
+import {
+  createStudent,
+  createUser,
+  fetchDepartments,
+  type Department,
+} from "../lib/api";
 
 interface StudentRegistrationProps {
   onBack: () => void;
@@ -22,8 +27,30 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
     dateOfBirth: "",
     password: "",
   });
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      setDepartmentsLoading(true);
+      try {
+        const results = await fetchDepartments();
+        setDepartments(results);
+        if (results.length && !formData.department) {
+          setFormData((prev) => ({ ...prev, department: String(results[0].department_id) }));
+        }
+      } catch (err) {
+        console.error("Unable to load departments", err);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    loadDepartments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCaptureImage = () => {
     // Simulate capturing an image
@@ -50,10 +77,15 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
         phone: formData.phoneNumber,
       });
 
+      const departmentName =
+        departments.find((dept) => String(dept.department_id) === formData.department)?.name ||
+        undefined;
+
       await createStudent({
         user_id: user.user_id,
         roll_number: formData.rollNumber,
-        department: formData.department,
+        department_id: formData.department || undefined,
+        department: departmentName,
         face_embeddings: JSON.stringify(capturedImages),
         registered_by: registeredBy || undefined,
       });
@@ -107,7 +139,12 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Panel - Form Fields */}
           <Card className="p-6">
-            <StudentForm formData={formData} setFormData={setFormData} />
+            <StudentForm
+              formData={formData}
+              setFormData={setFormData}
+              departments={departments}
+              departmentsLoading={departmentsLoading}
+            />
           </Card>
 
           {/* Right Panel - Face Capture */}
