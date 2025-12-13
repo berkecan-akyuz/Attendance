@@ -3,14 +3,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { UserPlus, Camera, FileText, Settings, Radio } from "lucide-react";
 
 interface QuickActionsProps {
-  onNavigateToRegister: () => void;
-  onNavigateToCameras: () => void;
-  onNavigateToReports: () => void;
-  onNavigateToSettings: () => void;
-  onNavigateToLive: () => void;
+  onNavigateToRegister?: () => void;
+  onNavigateToCameras?: () => void;
+  onNavigateToReports?: () => void;
+  onNavigateToSettings?: () => void;
+  onNavigateToLive?: () => void;
 }
 
-export function QuickActions({ onNavigateToRegister, onNavigateToCameras, onNavigateToReports, onNavigateToSettings, onNavigateToLive }: QuickActionsProps) {
+const missingHandler = (destination: string) => () =>
+  console.warn(`QuickActions navigation is not wired: ${destination}`);
+
+export function QuickActions({
+  onNavigateToRegister = missingHandler("register"),
+  onNavigateToCameras = missingHandler("cameras"),
+  onNavigateToReports = missingHandler("reports"),
+  onNavigateToSettings = missingHandler("settings"),
+  onNavigateToLive = missingHandler("live"),
+}: QuickActionsProps) {
   const actions = [
     {
       title: "Live Monitoring",
