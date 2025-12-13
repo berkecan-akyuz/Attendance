@@ -7,21 +7,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import type { Department } from "../lib/api";
 
 interface StudentFormProps {
   formData: {
     fullName: string;
     rollNumber: string;
-    classSection: string;
     department: string;
     email: string;
     phoneNumber: string;
     dateOfBirth: string;
+    password: string;
   };
+  departments: Department[];
+  departmentsLoading?: boolean;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-export function StudentForm({ formData, setFormData }: StudentFormProps) {
+export function StudentForm({
+  formData,
+  setFormData,
+  departments,
+  departmentsLoading,
+}: StudentFormProps) {
   const handleChange = (field: string, value: string) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
@@ -64,29 +72,6 @@ export function StudentForm({ formData, setFormData }: StudentFormProps) {
           />
         </div>
 
-        {/* Class/Section */}
-        <div className="space-y-2">
-          <Label htmlFor="classSection">
-            Class/Section <span className="text-red-500">*</span>
-          </Label>
-          <Select
-            value={formData.classSection}
-            onValueChange={(value) => handleChange("classSection", value)}
-          >
-            <SelectTrigger id="classSection">
-              <SelectValue placeholder="Select class/section" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10-A">10-A</SelectItem>
-              <SelectItem value="10-B">10-B</SelectItem>
-              <SelectItem value="11-A">11-A</SelectItem>
-              <SelectItem value="11-B">11-B</SelectItem>
-              <SelectItem value="12-A">12-A</SelectItem>
-              <SelectItem value="12-B">12-B</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         {/* Department */}
         <div className="space-y-2">
           <Label htmlFor="department">
@@ -95,16 +80,28 @@ export function StudentForm({ formData, setFormData }: StudentFormProps) {
           <Select
             value={formData.department}
             onValueChange={(value) => handleChange("department", value)}
+            disabled={departmentsLoading}
           >
             <SelectTrigger id="department">
-              <SelectValue placeholder="Select department" />
+              <SelectValue placeholder={
+                departmentsLoading
+                  ? "Loading departments..."
+                  : departments.length
+                  ? "Select department"
+                  : "No departments available"
+              } />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="science">Science</SelectItem>
-              <SelectItem value="commerce">Commerce</SelectItem>
-              <SelectItem value="arts">Arts</SelectItem>
-              <SelectItem value="engineering">Engineering</SelectItem>
-              <SelectItem value="medical">Medical</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept.department_id} value={String(dept.department_id)}>
+                  {dept.name}
+                </SelectItem>
+              ))}
+              {!departments.length && (
+                <SelectItem value="no-departments" disabled>
+                  No departments found
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -120,6 +117,21 @@ export function StudentForm({ formData, setFormData }: StudentFormProps) {
             placeholder="student@example.com"
             value={formData.email}
             onChange={(e) => handleChange("email", e.target.value)}
+            required
+          />
+        </div>
+
+        {/* Password */}
+        <div className="space-y-2">
+          <Label htmlFor="password">
+            Password <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter a secure password"
+            value={formData.password}
+            onChange={(e) => handleChange("password", e.target.value)}
             required
           />
         </div>

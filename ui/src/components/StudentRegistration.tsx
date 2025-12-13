@@ -1,25 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StudentForm } from "./StudentForm";
 import { FaceCapture } from "./FaceCapture";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { ArrowLeft } from "lucide-react";
+import {
+  createStudent,
+  createUser,
+  fetchDepartments,
+  type Department,
+} from "../lib/api";
 
 interface StudentRegistrationProps {
   onBack: () => void;
+  registeredBy?: number | null;
 }
 
-export function StudentRegistration({ onBack }: StudentRegistrationProps) {
+export function StudentRegistration({ onBack, registeredBy }: StudentRegistrationProps) {
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     fullName: "",
     rollNumber: "",
-    classSection: "",
     department: "",
     email: "",
     phoneNumber: "",
     dateOfBirth: "",
+    password: "",
   });
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      setDepartmentsLoading(true);
+      try {
+        const results = await fetchDepartments();
+        setDepartments(results);
+        if (results.length && !formData.department) {
+          setFormData((prev) => ({ ...prev, department: String(results[0].department_id) }));
+        }
+      } catch (err) {
+        console.error("Unable to load departments", err);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    loadDepartments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCaptureImage = () => {
     // Simulate capturing an image
@@ -33,11 +64,40 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
     setCapturedImages(capturedImages.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
-    console.log("Saving student data:", { formData, capturedImages });
-    // Show success message and navigate back
-    alert("Student registered successfully!");
-    onBack();
+  const handleSave = async () => {
+    setError(null);
+    setIsSaving(true);
+    try {
+      const user = await createUser({
+        username: formData.email,
+        email: formData.email,
+        password: formData.password || formData.rollNumber || "tempPass123!",
+        role: "Student",
+        full_name: formData.fullName,
+        phone: formData.phoneNumber,
+      });
+
+      const departmentName =
+        departments.find((dept) => String(dept.department_id) === formData.department)?.name ||
+        undefined;
+
+      await createStudent({
+        user_id: user.user_id,
+        roll_number: formData.rollNumber,
+        department_id: formData.department || undefined,
+        department: departmentName,
+        face_embeddings: JSON.stringify(capturedImages),
+        registered_by: registeredBy || undefined,
+      });
+
+      alert("Student registered successfully!");
+      onBack();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to save student";
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -50,13 +110,13 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
     const requiredFields = [
       formData.fullName,
       formData.rollNumber,
-      formData.classSection,
       formData.department,
       formData.email,
+      formData.password,
     ];
     const allFieldsFilled = requiredFields.every((field) => field.trim() !== "");
     const hasEnoughImages = capturedImages.length >= 3;
-    return allFieldsFilled && hasEnoughImages;
+    return allFieldsFilled && hasEnoughImages && formData.password.length >= 6;
   };
 
   return (
@@ -79,7 +139,12 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Panel - Form Fields */}
           <Card className="p-6">
-            <StudentForm formData={formData} setFormData={setFormData} />
+            <StudentForm
+              formData={formData}
+              setFormData={setFormData}
+              departments={departments}
+              departmentsLoading={departmentsLoading}
+            />
           </Card>
 
           {/* Right Panel - Face Capture */}
@@ -110,12 +175,13 @@ export function StudentRegistration({ onBack }: StudentRegistrationProps) {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!isFormValid()}
+              disabled={!isFormValid() || isSaving}
               className="px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              Save Student
+              {isSaving ? "Saving..." : "Save Student"}
             </Button>
           </div>
+          {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
         </div>
       </div>
     </div>

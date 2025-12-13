@@ -1,23 +1,26 @@
 import { Card } from "./ui/card";
 import { Users, UserCheck, Camera, TrendingUp } from "lucide-react";
+import { OverviewStats } from "../lib/api";
 
 interface DashboardStatsProps {
   onNavigateToUsers?: (filter?: string) => void;
   onNavigateToCameras?: () => void;
   onNavigateToReports?: (filter?: string) => void;
+  stats?: OverviewStats | null;
 }
 
-export function DashboardStats({ 
-  onNavigateToUsers, 
-  onNavigateToCameras, 
-  onNavigateToReports 
+export function DashboardStats({
+  onNavigateToUsers,
+  onNavigateToCameras,
+  onNavigateToReports,
+  stats,
 }: DashboardStatsProps) {
-  const stats = [
+  const cards = [
     {
       id: "students",
       title: "Total Students",
-      value: "1,234",
-      change: "+12%",
+      value: stats?.total_students ?? "-",
+      change: "From SQL Server",
       icon: Users,
       iconBg: "bg-blue-100",
       iconColor: "text-blue-600",
@@ -25,21 +28,21 @@ export function DashboardStats({
       onClick: () => onNavigateToUsers?.("students"),
     },
     {
-      id: "present",
-      title: "Present Today",
-      value: "1,089",
-      change: "88.2%",
+      id: "teachers",
+      title: "Total Teachers",
+      value: stats?.total_teachers ?? "-",
+      change: "Assigned lecturers",
       icon: UserCheck,
       iconBg: "bg-green-100",
       iconColor: "text-green-600",
-      trend: "up",
-      onClick: () => onNavigateToReports?.("today"),
+      trend: "neutral",
+      onClick: () => onNavigateToUsers?.("teachers"),
     },
     {
-      id: "cameras",
-      title: "Active Cameras",
-      value: "12/15",
-      change: "80%",
+      id: "lectures",
+      title: "Active Lectures",
+      value: stats?.total_lectures ?? "-",
+      change: "Scheduled classes",
       icon: Camera,
       iconBg: "bg-purple-100",
       iconColor: "text-purple-600",
@@ -47,10 +50,10 @@ export function DashboardStats({
       onClick: () => onNavigateToCameras?.(),
     },
     {
-      id: "attendance",
-      title: "Avg Attendance",
-      value: "92.5%",
-      change: "+2.3%",
+      id: "enrollments",
+      title: "Total Enrollments",
+      value: stats?.total_enrollments ?? "-",
+      change: "Student-course links",
       icon: TrendingUp,
       iconBg: "bg-orange-100",
       iconColor: "text-orange-600",
@@ -61,9 +64,9 @@ export function DashboardStats({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat) => (
-        <Card 
-          key={stat.id} 
+      {cards.map((stat) => (
+        <Card
+          key={stat.id}
           className="p-6 cursor-pointer hover:shadow-lg transition-all hover:scale-105 active:scale-100"
           onClick={stat.onClick}
         >

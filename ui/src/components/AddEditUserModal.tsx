@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -12,6 +12,7 @@ import {
 } from "./ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { X, Upload, User as UserIcon } from "lucide-react";
+import { fetchDepartments, type Department } from "../lib/api";
 
 interface User {
   id: string;
@@ -22,6 +23,8 @@ interface User {
   photo: string;
   status: boolean;
   lastLogin: string;
+  password?: string;
+  phone?: string;
 }
 
 interface AddEditUserModalProps {
@@ -34,17 +37,48 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
-    role: user?.role || "student",
+    role: user?.role || "teacher",
     department: user?.department || "",
     password: "",
     confirmPassword: "",
     photo: user?.photo || "",
     status: user?.status !== undefined ? user.status : true,
+    phone: user?.phone || "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [photoPreview, setPhotoPreview] = useState(user?.photo || "");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      setDepartmentsLoading(true);
+      try {
+        const results = await fetchDepartments();
+        setDepartments(results);
+
+        if (formData.role === "teacher") {
+          const matched = results.find(
+            (dept) => user?.department && dept.name.toLowerCase() === user.department.toLowerCase()
+          );
+
+          const fallbackId = matched?.department_id || results[0]?.department_id;
+          if (fallbackId && !formData.department) {
+            setFormData((prev) => ({ ...prev, department: String(fallbackId) }));
+          }
+        }
+      } catch (err) {
+        console.error("Unable to load departments", err);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    loadDepartments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData({ ...formData, [field]: value });
@@ -103,19 +137,25 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
 
   const handleSubmit = () => {
     if (validateForm()) {
+      const departmentName =
+        departments.find((dept) => String(dept.department_id) === formData.department)?.name ||
+        (formData.department ? formData.department : undefined);
+
       onSave({
         name: formData.name,
         email: formData.email,
         role: formData.role as "admin" | "teacher" | "student",
-        department: formData.role === "teacher" ? formData.department : undefined,
+        department: formData.role === "teacher" ? departmentName : undefined,
         photo: formData.photo,
         status: formData.status,
+        password: formData.password,
+        phone: formData.phone,
       });
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
@@ -208,9 +248,22 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="teacher">Teacher</SelectItem>
-                  <SelectItem value="student">Student</SelectItem>
+                  {user?.role === "student" && (
+                    <SelectItem value="student">Student</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                placeholder="+1 (555) 000-0000"
+              />
             </div>
 
             {/* Department (conditional) */}
@@ -219,13 +272,41 @@ export function AddEditUserModal({ user, onSave, onClose }: AddEditUserModalProp
                 <Label htmlFor="department">
                   Department <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="department"
+                <Select
                   value={formData.department}
-                  onChange={(e) => handleInputChange("department", e.target.value)}
-                  placeholder="Enter department"
-                  className={errors.department ? "border-red-500" : ""}
-                />
+                  onValueChange={(value) => handleInputChange("department", value)}
+                  disabled={departmentsLoading}
+                >
+                  <SelectTrigger
+                    id="department"
+                    className={errors.department ? "border-red-500" : ""}
+                  >
+                    <SelectValue
+                      placeholder={
+                        departmentsLoading
+                          ? "Loading departments..."
+                          : departments.length
+                          ? "Select department"
+                          : "No departments available"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((dept) => (
+                      <SelectItem
+                        key={dept.department_id}
+                        value={String(dept.department_id)}
+                      >
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                    {!departments.length && (
+                      <SelectItem value="no-departments" disabled>
+                        No departments found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 {errors.department && (
                   <p className="text-red-500">{errors.department}</p>
                 )}
