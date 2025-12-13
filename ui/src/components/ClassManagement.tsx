@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Progress } from "./ui/progress";
+import { Checkbox } from "./ui/checkbox";
+import { ScrollArea } from "./ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -105,6 +107,8 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const [studentModalTab, setStudentModalTab] = useState<"students" | "attendance">("students");
   const [classStudents, setClassStudents] = useState<ClassStudent[]>([]);
   const [availableStudents, setAvailableStudents] = useState<ClassStudent[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [attendanceSummary, setAttendanceSummary] = useState<
     | { present: number; absent: number; late: number; unknown: number; total_records: number }
     | null
@@ -123,7 +127,6 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   >([]);
   const [studentModalLoading, setStudentModalLoading] = useState(false);
   const [studentModalError, setStudentModalError] = useState<string | null>(null);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
 
   const getSemesterLabel = (value: string | number | null | undefined) => {
     const map: Record<string, string> = {
@@ -349,7 +352,8 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   const handleOpenStudents = (cls: Class, tab: "students" | "attendance" = "students") => {
     setStudentModalClass(cls);
     setStudentModalTab(tab);
-    setSelectedStudentId("");
+    setSelectedStudentIds([]);
+    setStudentSearchQuery("");
     setStudentModalError(null);
     setAttendanceSummary(null);
     setAttendanceSessions([]);
@@ -382,13 +386,29 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
   }, [studentModalOpen, studentModalClass?.id, studentModalTab]);
 
   const handleAddStudentToClass = async () => {
-    if (!studentModalClass || !selectedStudentId) return;
+    if (!studentModalClass || selectedStudentIds.length === 0) return;
     setStudentModalLoading(true);
     setStudentModalError(null);
     try {
-      await enrollStudentInLecture(Number(studentModalClass.id), Number(selectedStudentId));
-      await loadClassStudents(Number(studentModalClass.id));
-      setSelectedStudentId("");
+      const lectureId = Number(studentModalClass.id);
+      const studentsToAdd = availableStudents.filter((student) =>
+        selectedStudentIds.includes(String(student.user_id))
+      );
+
+      await Promise.all(
+        studentsToAdd.map((student) => enrollStudentInLecture(lectureId, student.user_id))
+      );
+
+      const updatedStudents = studentsToAdd.map((student) => ({
+        ...student,
+        enrollment_status: student.enrollment_status || "Active",
+      }));
+
+      setClassStudents([...classStudents, ...updatedStudents]);
+      setAvailableStudents(
+        availableStudents.filter((student) => !selectedStudentIds.includes(String(student.user_id)))
+      );
+      setSelectedStudentIds([]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to add student";
       setStudentModalError(message);
@@ -410,6 +430,34 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
     } finally {
       setStudentModalLoading(false);
     }
+  };
+
+  const filteredAvailableStudents = useMemo(() => {
+    const query = studentSearchQuery.trim().toLowerCase();
+    if (!query) return availableStudents;
+    return availableStudents.filter((student) => {
+      const fullName = (student.full_name || "").toLowerCase();
+      const email = (student.email || "").toLowerCase();
+      const roll = (student.roll_number || "").toLowerCase();
+      return (
+        fullName.includes(query) || email.includes(query) || roll.includes(query)
+      );
+    });
+  }, [availableStudents, studentSearchQuery]);
+
+  const toggleStudentSelection = (userId: number) => {
+    const id = String(userId);
+    setSelectedStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((val) => val !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllVisible = () => {
+    if (filteredAvailableStudents.length === 0) {
+      return;
+    }
+    const visibleIds = filteredAvailableStudents.map((student) => String(student.user_id));
+    setSelectedStudentIds(visibleIds);
   };
 
   const refreshClasses = async () => {
@@ -982,30 +1030,71 @@ export function ClassManagement({ onBack, userRole, teacherUserId }: ClassManage
 
                   <div className="space-y-3">
                     <h4 className="text-gray-900">Add Student to Class</h4>
-                    <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a student" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableStudents.length === 0 ? (
-                          <SelectItem value="no-students" disabled>
-                            No available students
-                          </SelectItem>
-                        ) : (
-                          availableStudents.map((student) => (
-                            <SelectItem key={student.user_id} value={String(student.user_id)}>
-                              {student.full_name || student.email || "Student"}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Search by name, email, or roll number"
+                        value={studentSearchQuery}
+                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      />
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSelectAllVisible}
+                          disabled={filteredAvailableStudents.length === 0}
+                        >
+                          Select Visible
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedStudentIds([])}
+                          disabled={selectedStudentIds.length === 0}
+                        >
+                          Clear
+                        </Button>
+                        <span className="ml-auto text-xs text-gray-500">
+                          {selectedStudentIds.length} selected
+                        </span>
+                      </div>
+                    </div>
+                    <ScrollArea className="h-64 border rounded-lg">
+                      {filteredAvailableStudents.length === 0 ? (
+                        <div className="p-4 text-sm text-gray-500">No students match your search.</div>
+                      ) : (
+                        <div className="divide-y">
+                          {filteredAvailableStudents.map((student) => {
+                            const id = String(student.user_id);
+                            return (
+                              <label
+                                key={id}
+                                className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={selectedStudentIds.includes(id)}
+                                  onCheckedChange={() => toggleStudentSelection(student.user_id)}
+                                />
+                                <div className="flex-1">
+                                  <p className="text-gray-900 font-medium">
+                                    {student.full_name || student.email || "Student"}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {student.roll_number ? `Roll: ${student.roll_number} · ` : ""}
+                                    {student.email}
+                                  </p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </ScrollArea>
                     <Button
                       className="w-full bg-blue-600 hover:bg-blue-700"
                       onClick={handleAddStudentToClass}
-                      disabled={!selectedStudentId || studentModalLoading}
+                      disabled={selectedStudentIds.length === 0 || studentModalLoading}
                     >
-                      Add Student
+                      Add Selected Students
                     </Button>
                   </div>
                 </div>
