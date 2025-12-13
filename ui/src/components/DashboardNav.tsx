@@ -20,7 +20,7 @@ interface DashboardNavProps {
   onNavigateToSettings?: () => void;
   onNavigateToNotifications?: () => void;
   unreadCount?: number;
-  onProfileClick?: (tab?: "profile" | "security" | "preferences") => void;
+  onProfileClick: (tab?: "profile" | "security" | "preferences") => void;
 }
 
 export function DashboardNav({
@@ -146,7 +146,7 @@ export function DashboardNav({
                 <DropdownMenuItem
                   onSelect={(event) => {
                     event.preventDefault();
-                    onProfileClick?.("profile");
+                    onProfileClick("profile");
                   }}
                 >
                   <User className="mr-2 h-4 w-4" />
@@ -155,7 +155,7 @@ export function DashboardNav({
                 <DropdownMenuItem
                   onSelect={(event) => {
                     event.preventDefault();
-                    onProfileClick?.("security");
+                    onProfileClick("security");
                   }}
                 >
                   <Settings className="mr-2 h-4 w-4" />
