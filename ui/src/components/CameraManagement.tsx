@@ -48,11 +48,11 @@ interface CameraManagementProps {
 
 export function CameraManagement({
   onBack,
-  onLogout,
-  onNavigateToSettings,
-  onNavigateToNotifications,
-  onNavigateToDashboard,
-  onNavigateToReports,
+  onLogout = () => {},
+  onNavigateToSettings = () => {},
+  onNavigateToNotifications = () => {},
+  onNavigateToDashboard = () => {},
+  onNavigateToReports = () => {},
   userRole = "admin",
   unreadCount = 0
 }: CameraManagementProps) {
@@ -233,18 +233,16 @@ export function CameraManagement({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      {onLogout && onNavigateToSettings && onNavigateToNotifications && (
-        <DashboardNav
-          currentPage="Cameras"
-          onPageChange={handlePageChange}
-          onLogout={onLogout}
-          userRole={userRole}
-          onNavigateToSettings={onNavigateToSettings}
-          onNavigateToNotifications={onNavigateToNotifications}
-          unreadCount={unreadCount}
-          onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
-        />
-      )}
+      <DashboardNav
+        currentPage="Cameras"
+        onPageChange={handlePageChange}
+        onLogout={onLogout}
+        userRole={userRole}
+        onNavigateToSettings={onNavigateToSettings}
+        onNavigateToNotifications={onNavigateToNotifications}
+        unreadCount={unreadCount}
+        onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
+      />
 
       <ProfileSettingsModal
         open={profileModal.open}

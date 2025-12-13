@@ -266,8 +266,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
+                    onSelect={() => {
                       setProfileModal({ open: true, tab: "profile" });
                     }}
                   >
@@ -275,8 +274,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
                     <span>Profile</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
+                    onSelect={() => {
                       setProfileModal({ open: true, tab: "security" });
                     }}
                   >
