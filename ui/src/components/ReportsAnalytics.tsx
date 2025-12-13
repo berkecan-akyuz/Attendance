@@ -64,11 +64,11 @@ export function ReportsAnalytics({
   onBack,
   userRole,
   userId,
-  onLogout,
-  onNavigateToSettings,
-  onNavigateToNotifications,
-  onNavigateToDashboard,
-  onNavigateToCameras,
+  onLogout = () => {},
+  onNavigateToSettings = () => {},
+  onNavigateToNotifications = () => {},
+  onNavigateToDashboard = () => {},
+  onNavigateToCameras = () => {},
   unreadCount = 0
 }: ReportsAnalyticsProps) {
   const [selectedClass, setSelectedClass] = useState("");
@@ -246,18 +246,16 @@ export function ReportsAnalytics({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      {onLogout && onNavigateToSettings && onNavigateToNotifications && (
-        <DashboardNav
-          currentPage="Reports"
-          onPageChange={handlePageChange}
-          onLogout={onLogout}
-          userRole={userRole}
-          onNavigateToSettings={onNavigateToSettings}
-          onNavigateToNotifications={onNavigateToNotifications}
-          unreadCount={unreadCount}
-          onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
-        />
-      )}
+      <DashboardNav
+        currentPage="Reports"
+        onPageChange={handlePageChange}
+        onLogout={onLogout}
+        userRole={userRole}
+        onNavigateToSettings={onNavigateToSettings}
+        onNavigateToNotifications={onNavigateToNotifications}
+        unreadCount={unreadCount}
+        onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
+      />
 
       <ProfileSettingsModal
         open={profileModal.open}

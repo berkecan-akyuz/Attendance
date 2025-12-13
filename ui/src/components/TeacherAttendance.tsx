@@ -315,8 +315,7 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault();
+                      onSelect={() => {
                         setProfileModal({ open: true, tab: "profile" });
                       }}
                     >
@@ -324,8 +323,7 @@ export function TeacherAttendance({ userId, onBack, onLogout, onNavigateToReport
                       <span>Profile</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault();
+                      onSelect={() => {
                         setProfileModal({ open: true, tab: "security" });
                       }}
                     >
