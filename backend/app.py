@@ -9,18 +9,19 @@ from sqlalchemy import case, func, or_, text
 from sqlalchemy.exc import DBAPIError, OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .models import (
+from models import (
+    db,
+    User,
+    Teacher,
+    Student,
+    Lecture,
+    UserLecture,
     AttendanceSession,
+    StudentAttendance,
     Camera,
     Department,
     FaceDataset,
-    Lecture,
-    Student,
-    StudentAttendance,
-    Teacher,
-    User,
-    UserLecture,
-    db,
+    AttendanceCorrectionRequest
 )
 
 
@@ -690,28 +691,80 @@ def register_routes(app: Flask) -> None:
         if not teacher:
             return error_response("Teacher profile not found", 404)
 
+        # Base query to get students enrolled in teacher's lectures
         enrollments = (
-            db.session.query(Student, UserLecture, Lecture)
+            db.session.query(Student, User, UserLecture, Lecture)
+            .join(User, User.user_id == Student.user_id)
             .join(UserLecture, UserLecture.user_id == Student.user_id)
             .join(Lecture, Lecture.lecture_id == UserLecture.lecture_id)
             .filter(Lecture.teacher_id == teacher.teacher_id, UserLecture.is_teacher == False)
             .all()
         )
 
-        results = []
-        for student, user_lecture, lecture in enrollments:
-            results.append(
-                {
-                    "student_id": student.student_id,
-                    "roll_number": student.roll_number,
-                    "full_name": student.user.full_name if student.user else "",
-                    "email": student.user.email if student.user else None,
-                    "lecture": lecture.lecture_name,
-                    "enrollment_status": user_lecture.enrollment_status,
-                }
+        # Aggregate attendance stats for these students across ALL teacher's lectures
+        # We want stats specific to THIS teacher's classes
+        stats_query = (
+            db.session.query(
+                StudentAttendance.user_id,
+                func.count(StudentAttendance.attendance_id).label("total"),
+                func.sum(case((StudentAttendance.status.ilike("present"), 1), else_=0)).label("present"),
+                func.sum(case((StudentAttendance.status.ilike("absent"), 1), else_=0)).label("absent"),
+                func.sum(case((StudentAttendance.status.ilike("late"), 1), else_=0)).label("late"),
             )
+            .join(AttendanceSession, AttendanceSession.session_id == StudentAttendance.session_id)
+            .join(Lecture, Lecture.lecture_id == AttendanceSession.lecture_id)
+            .filter(Lecture.teacher_id == teacher.teacher_id)
+            .group_by(StudentAttendance.user_id)
+            .all()
+        )
+        
+        stats_map = {
+            row.user_id: {
+                "total": row.total,
+                "present": row.present or 0,
+                "absent": row.absent or 0,
+                "late": row.late or 0
+            } for row in stats_query
+        }
 
-        return jsonify(results)
+        # Deduplicate students (student might be in multiple classes)
+        # We will summarize their performance across all classes of this teacher
+        # OR we can return one entry per enrollment. 
+        # The frontend expects a list of students. If a student is in Math and Physics (both taught by same teacher), 
+        # they might appear twice or once. 
+        # Let's deduplicate by student_id to show "Overall Performance" for that student with this teacher.
+        
+        unique_students = {}
+        for student, user, user_lecture, lecture in enrollments:
+            if student.student_id not in unique_students:
+                s_stats = stats_map.get(student.user_id, {"total": 0, "present": 0, "absent": 0, "late": 0})
+                
+                # Calculate percentage
+                total = s_stats["total"]
+                pct = (s_stats["present"] / total * 100) if total > 0 else 0
+
+                unique_students[student.student_id] = {
+                    "student_id": student.student_id,
+                    "user_id": student.user_id,
+                    "roll_number": student.roll_number,
+                    "full_name": user.full_name,
+                    "email": user.email,
+                    # We might want to list the lectures they are in? 
+                    # For now just picking the first one found or generic
+                    "lecture": lecture.lecture_name, 
+                    "enrollment_status": user_lecture.enrollment_status,
+                    "total_classes": total,
+                    "present": s_stats["present"],
+                    "absent": s_stats["absent"],
+                    "late": s_stats["late"],
+                    "attendance_percentage": round(pct, 1)
+                }
+            else:
+                # If already added, loop implies we might want to append lecture names?
+                # For simplicity, keeping first entry.
+                pass
+
+        return jsonify(list(unique_students.values()))
 
     @app.route("/api/teachers", methods=["POST"])
     def create_teacher():
@@ -953,8 +1006,36 @@ def register_routes(app: Flask) -> None:
             .all()
         )
 
+        # Get stats for this specific lecture
+        stats_query = (
+            db.session.query(
+                StudentAttendance.user_id,
+                func.count(StudentAttendance.attendance_id).label("total"),
+                func.sum(case((StudentAttendance.status.ilike("present"), 1), else_=0)).label("present"),
+                func.sum(case((StudentAttendance.status.ilike("absent"), 1), else_=0)).label("absent"),
+                func.sum(case((StudentAttendance.status.ilike("late"), 1), else_=0)).label("late"),
+            )
+            .join(AttendanceSession, AttendanceSession.session_id == StudentAttendance.session_id)
+            .filter(AttendanceSession.lecture_id == lecture_id)
+            .group_by(StudentAttendance.user_id)
+            .all()
+        )
+
+        stats_map = {
+            row.user_id: {
+                "total": row.total,
+                "present": row.present or 0,
+                "absent": row.absent or 0,
+                "late": row.late or 0
+            } for row in stats_query
+        }
+
         payload = []
         for student, user, enrollment in enrollments:
+            s_stats = stats_map.get(student.user_id, {"total": 0, "present": 0, "absent": 0, "late": 0})
+            total = s_stats["total"]
+            pct = (s_stats["present"] / total * 100) if total > 0 else 0
+
             payload.append(
                 {
                     "student_id": student.student_id,
@@ -963,9 +1044,12 @@ def register_routes(app: Flask) -> None:
                     "full_name": user.full_name,
                     "email": user.email,
                     "enrollment_status": enrollment.enrollment_status,
-                    "enrolled_at": enrollment.enrolled_at.isoformat()
-                    if enrollment.enrolled_at
-                    else None,
+                    "enrolled_at": enrollment.enrolled_at.isoformat() if enrollment.enrolled_at else None,
+                    "total_classes": total,
+                    "present": s_stats["present"],
+                    "absent": s_stats["absent"],
+                    "late": s_stats["late"],
+                    "attendance_percentage": round(pct, 1)
                 }
             )
 
@@ -1108,9 +1192,233 @@ def register_routes(app: Flask) -> None:
             return error_response(f"Unable to delete camera: {exc}", 500)
 
 
+    @app.route("/api/change-password", methods=["POST"])
+    def change_password():
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+        current_password = data.get("current_password")
+        new_password = data.get("new_password")
+
+        if not all([user_id, current_password, new_password]):
+            return error_response("Missing required fields", 400)
+
+        user = User.query.get(user_id)
+        if not user or not check_password_hash(user.password_hash, current_password):
+            return error_response("Invalid current password", 401)
+
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        return jsonify({"message": "Password updated successfully"})
+
+    @app.route("/api/sessions/get-or-create", methods=["POST"])
+    def get_or_create_session():
+        data = request.get_json() or {}
+        lecture_name = data.get("lecture_name")
+        date_str = data.get("date")
+
+        if not all([lecture_name, date_str]):
+            return error_response("Missing required fields", 400)
+
+        try:
+            # Find lecture (assuming unique names for simplicity, or we could pass ID)
+            lecture = Lecture.query.filter_by(lecture_name=lecture_name).first()
+            if not lecture:
+                return error_response("Lecture not found", 404)
+
+            session_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            
+            # Check for existing session
+            session = AttendanceSession.query.filter_by(
+                lecture_id=lecture.lecture_id,
+                session_date=session_date
+            ).first()
+
+            if not session:
+                session = AttendanceSession(
+                    lecture_id=lecture.lecture_id,
+                    session_date=session_date,
+                    session_start_time=datetime.strptime("09:00", "%H:%M").time(),
+                    session_end_time=datetime.strptime("17:00", "%H:%M").time(),
+                    status="Scheduled"
+                )
+                db.session.add(session)
+                db.session.commit()
+
+            # Fetch existing attendance records for this session
+            records = StudentAttendance.query.filter_by(session_id=session.session_id).all()
+            existing_records = {r.user_id: r.status for r in records}
+
+            return jsonify({
+                "session_id": session.session_id,
+                "existing_records": existing_records
+            })
+        except ValueError:
+            return error_response("Invalid date format", 400)
+        except Exception as e:
+            db.session.rollback()
+            return error_response(str(e), 500)
+
+    @app.route("/api/attendance/batch", methods=["POST"])
+    def batch_mark_attendance():
+        data = request.get_json() or {}
+        records = data.get("records", [])
+        verified_by = data.get("verified_by")
+        
+        if not records:
+            return error_response("No records provided", 400)
+
+        processed_count = 0
+        try:
+            for record in records:
+                session_id = record.get("session_id")
+                user_id = record.get("user_id")
+                status = record.get("status")
+                
+                if not all([session_id, user_id, status]):
+                    continue
+
+                # Check if session exists
+                session = AttendanceSession.query.get(session_id)
+                if not session:
+                    continue
+
+                # Check existing record
+                attendance = StudentAttendance.query.filter_by(
+                    session_id=session_id, user_id=user_id
+                ).first()
+
+                if attendance:
+                    attendance.status = status
+                    attendance.manual_override = True
+                    attendance.edited_by = verified_by
+                    attendance.edited_at = datetime.now(timezone.utc)
+                    if status == "Present" and not attendance.time_in:
+                        attendance.time_in = session.session_start_time
+                else:
+                    attendance = StudentAttendance(
+                        session_id=session_id,
+                        user_id=user_id,
+                        status=status,
+                        verification_method="Manual",
+                        verified_by=verified_by,
+                        manual_override=True,
+                        time_in=session.session_start_time if status == "Present" else None
+                    )
+                    db.session.add(attendance)
+                
+                processed_count += 1
+            
+            db.session.commit()
+            return jsonify({"message": f"Successfully updated {processed_count} records"})
+        except Exception as e:
+            db.session.rollback()
+            return error_response(str(e), 500)
+
+    @app.route("/api/attendance/correction", methods=["GET", "POST"])
+    def correction_requests():
+        if request.method == "POST":
+            data = request.get_json() or {}
+            attendance_id = data.get("attendance_id")
+            user_id = data.get("user_id")
+            reason = data.get("reason")
+
+            if not all([attendance_id, user_id, reason]):
+                return error_response("Missing required fields", 400)
+
+            # verify ownership
+            attendance = StudentAttendance.query.get(attendance_id)
+            if not attendance or attendance.user_id != user_id:
+                return error_response("Invalid attendance record", 400)
+
+            req = AttendanceCorrectionRequest(
+                attendance_id=attendance_id,
+                requesting_user_id=user_id,
+                reason=reason
+            )
+            db.session.add(req)
+            db.session.commit()
+            return jsonify(req.to_dict()), 201
+
+        # GET - list requests
+        # filters: teacher_id (optional) to see requests for their classes
+        teacher_id = request.args.get("teacher_id")
+        query = AttendanceCorrectionRequest.query.filter(AttendanceCorrectionRequest.status == "Pending")
+        
+        if teacher_id:
+            # The teacher_id param is actually a user_id from frontend
+            teacher = Teacher.query.filter_by(user_id=teacher_id).first()
+            if teacher:
+                # Filter by the actual teacher_id PK
+                query = query.join(StudentAttendance).join(AttendanceSession).join(Lecture).filter(
+                    Lecture.teacher_id == teacher.teacher_id
+                )
+            else:
+                # If user is not a teacher, show nothing? or just don't filter?
+                # Safer to return empty if invalid teacher
+                return jsonify([])
+
+        requests = query.order_by(AttendanceCorrectionRequest.requested_at.desc()).all()
+        return jsonify([r.to_dict() for r in requests])
+
+    @app.route("/api/attendance/correction/<int:req_id>/resolve", methods=["POST"])
+    def resolve_correction(req_id):
+        data = request.get_json() or {}
+        status = data.get("status") # Approved or Rejected
+        reviewed_by = data.get("reviewed_by")
+        notes = data.get("notes")
+
+        if status not in ["Approved", "Rejected"]:
+            return error_response("Invalid status", 400)
+
+        req = AttendanceCorrectionRequest.query.get(req_id)
+        if not req:
+            return error_response("Request not found", 404)
+
+        if req.status != "Pending":
+            return error_response("Request already resolved", 400)
+
+        req.status = status
+        req.reviewed_by = reviewed_by
+        req.review_notes = notes
+        req.reviewed_at = datetime.now(timezone.utc)
+
+        if status == "Approved":
+            # Update the attendance record
+            attendance = req.attendance_record
+            attendance.status = "Present" # Default to present if approved, or maybe passed in?
+            attendance.manual_override = True
+            attendance.edited_by = reviewed_by
+            attendance.edited_at = datetime.now(timezone.utc)
+            attendance.notes = f"Correction approved: {notes or 'No notes'}"
+
+        db.session.commit()
+        return jsonify(req.to_dict())
+
+
 app = create_app()
 
 
+@app.route("/api/departments", methods=["GET"])
+def list_departments():
+    departments = Department.query.order_by(Department.name).all()
+    return jsonify([dept.to_dict() for dept in departments])
+
+@app.route("/api/departments", methods=["POST"])
+def create_department():
+    data = request.get_json()
+    if not data or "name" not in data:
+        return error_response("Department name required", 400)
+    
+    name = data["name"].strip()
+    code = data.get("code", "").strip()
+    
+    if Department.query.filter_by(name=name).first():
+        return error_response("Department already exists", 400)
+        
+    dept = Department(name=name, code=code)
+    db.session.add(dept)
+    db.session.commit()
+    return jsonify(dept.to_dict()), 201
+
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True, host="0.0.0.0", port=5000)

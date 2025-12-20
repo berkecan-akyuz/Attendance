@@ -90,11 +90,10 @@ export function DashboardNav({
                         onPageChange(item.id);
                       }
                     }}
-                    className={`px-4 py-2 rounded-t-lg transition-all relative ${
-                      isActive
-                        ? "text-blue-600"
-                        : "text-gray-600 hover:bg-blue-50 hover:text-gray-900"
-                    }`}
+                    className={`px-4 py-2 rounded-t-lg transition-all relative ${isActive
+                      ? "text-blue-600"
+                      : "text-gray-600 hover:bg-blue-50 hover:text-gray-900"
+                      }`}
                   >
                     <span className={isActive ? "" : ""}>{item.label}</span>
                     {isActive && (
@@ -124,7 +123,7 @@ export function DashboardNav({
             )}
 
             {/* Profile Dropdown */}
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">

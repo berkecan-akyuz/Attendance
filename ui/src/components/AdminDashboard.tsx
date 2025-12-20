@@ -7,7 +7,7 @@ import { AttendanceOverview } from "./AttendanceOverview";
 import { UserManagement } from "./UserManagement";
 import { ClassManagement } from "./ClassManagement";
 import { fetchOverviewStats, OverviewStats } from "../lib/api";
-import { ProfileSettingsModal } from "./ProfileSettingsModal";
+
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -22,14 +22,15 @@ interface AdminDashboardProps {
   activeSection?: string;
   onSectionChange?: (section: string) => void;
   unreadCount?: number;
+  onNavigateToUserProfile?: (tab?: string) => void;
 }
 
-export function AdminDashboard({ 
-  onLogout, 
-  onNavigateToRegister, 
-  onNavigateToCameras, 
-  onNavigateToReports, 
-  onNavigateToSettings, 
+export function AdminDashboard({
+  onLogout,
+  onNavigateToRegister,
+  onNavigateToCameras,
+  onNavigateToReports,
+  onNavigateToSettings,
   onNavigateToLive,
   onNavigateToNotifications,
   userRole,
@@ -37,14 +38,13 @@ export function AdminDashboard({
   activeSection,
   onSectionChange,
   unreadCount = 0,
+  onNavigateToUserProfile,
 }: AdminDashboardProps) {
   const [currentPage, setCurrentPage] = useState(activeSection || "Dashboard");
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [profileModal, setProfileModal] = useState<{
-    open: boolean;
-    tab: "profile" | "security" | "preferences";
-  }>({ open: false, tab: "profile" });
+  // Modal state removed
+
 
   useEffect(() => {
     if (activeSection && activeSection !== currentPage) {
@@ -102,17 +102,14 @@ export function AdminDashboard({
         onNavigateToSettings={onNavigateToSettings}
         onNavigateToNotifications={onNavigateToNotifications}
         unreadCount={unreadCount}
-        onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
+        onProfileClick={(tab) => {
+          if (onNavigateToUserProfile) {
+            onNavigateToUserProfile(tab);
+          }
+        }}
       />
 
-      <ProfileSettingsModal
-        open={profileModal.open}
-        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
-        role="admin"
-        userName="Admin User"
-        email="admin@attendance.com"
-        defaultTab={profileModal.tab}
-      />
+
 
       {/* Main Content */}
       {currentPage === "Dashboard" && (
@@ -137,7 +134,7 @@ export function AdminDashboard({
           />
 
           {/* Quick Actions */}
-          <QuickActions 
+          <QuickActions
             onNavigateToRegister={onNavigateToRegister}
             onNavigateToCameras={onNavigateToCameras}
             onNavigateToReports={onNavigateToReports}
@@ -151,7 +148,7 @@ export function AdminDashboard({
               <AttendanceOverview />
             </div>
             <div className="lg:col-span-1">
-              <RecentActivity 
+              <RecentActivity
                 onViewAllActivity={() => {
                   // Navigate to activity logs or notifications
                   onNavigateToNotifications();

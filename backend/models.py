@@ -168,6 +168,7 @@ class Lecture(db.Model):
             "semester": self.semester,
             "year": self.year,
             "room_number": self.room_number,
+            "schedule": self.schedule,
             "capacity": self.capacity,
             "credits": self.credits,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -333,4 +334,42 @@ class FaceDataset(db.Model):
             "capture_device": self.capture_device,
             "capture_date": self.capture_date.isoformat() if self.capture_date else None,
             "quality_score": self.quality_score,
+        }
+
+
+class AttendanceCorrectionRequest(db.Model):
+    __tablename__ = "Attendance_Correction_Request"
+
+    request_id = db.Column(db.Integer, primary_key=True)
+    attendance_id = db.Column(db.Integer, db.ForeignKey("Student_Attendance.attendance_id"), nullable=False)
+    requesting_user_id = db.Column(db.Integer, db.ForeignKey("User.user_id"), nullable=False)
+    reason = db.Column(db.Text, nullable=False)
+    requested_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    status = db.Column(db.String(20), default="Pending")
+    reviewed_by = db.Column(db.Integer, db.ForeignKey("User.user_id"))
+    reviewed_at = db.Column(db.DateTime)
+    review_notes = db.Column(db.Text)
+
+    attendance_record = db.relationship("StudentAttendance", backref=db.backref("correction_requests", lazy=True))
+    requesting_user = db.relationship("User", foreign_keys=[requesting_user_id])
+    reviewed_by_user = db.relationship("User", foreign_keys=[reviewed_by])
+
+    def to_dict(self):
+        return {
+            "request_id": self.request_id,
+            "attendance_id": self.attendance_id,
+            "requesting_user_id": self.requesting_user_id,
+            "requesting_user_name": self.requesting_user.full_name if self.requesting_user else None,
+            "reason": self.reason,
+            "requested_at": self.requested_at.isoformat() if self.requested_at else None,
+            "status": self.status,
+            "reviewed_by": self.reviewed_by,
+            "reviewed_by_name": self.reviewed_by_user.full_name if self.reviewed_by_user else None,
+            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "review_notes": self.review_notes,
+            "attendance_details": {
+                "date": self.attendance_record.session.session_date.isoformat() if self.attendance_record and self.attendance_record.session and self.attendance_record.session.session_date else None,
+                "lecture_name": self.attendance_record.session.lecture.lecture_name if self.attendance_record and self.attendance_record.session and self.attendance_record.session.lecture else None,
+                "current_status": self.attendance_record.status if self.attendance_record else None
+            } if self.attendance_record else None
         }

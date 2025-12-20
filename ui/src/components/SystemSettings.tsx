@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { DashboardNav } from "./DashboardNav";
-import { ProfileSettingsModal } from "./ProfileSettingsModal";
+
 import {
   Settings,
   Clock,
@@ -40,23 +40,21 @@ interface SystemSettingsProps {
   onNavigateToCameras?: () => void;
   userRole?: string;
   unreadCount?: number;
+  onNavigateToUserProfile?: (tab?: string) => void;
 }
 
 export function SystemSettings({
   onBack,
-  onLogout = () => {},
-  onNavigateToNotifications = () => {},
-  onNavigateToDashboard = () => {},
-  onNavigateToReports = () => {},
-  onNavigateToCameras = () => {},
+  onLogout = () => { },
+  onNavigateToNotifications = () => { },
+  onNavigateToDashboard = () => { },
+  onNavigateToReports = () => { },
+  onNavigateToCameras = () => { },
   userRole = "admin",
-  unreadCount = 0
+  unreadCount = 0,
+  onNavigateToUserProfile,
 }: SystemSettingsProps) {
   const [activeSection, setActiveSection] = useState("general");
-  const [profileModal, setProfileModal] = useState<{
-    open: boolean;
-    tab: "profile" | "security" | "preferences";
-  }>({ open: false, tab: "profile" });
 
   // General Settings State
   const [systemName, setSystemName] = useState("Face Recognition Attendance System");
@@ -319,7 +317,7 @@ export function SystemSettings({
                 <span className="text-gray-600">12-hour</span>
                 <Switch
                   checked={timeFormat === "24-hour"}
-                  onCheckedChange={(checked) =>
+                  onCheckedChange={(checked: boolean) =>
                     setTimeFormat(checked ? "24-hour" : "12-hour")
                   }
                 />
@@ -334,11 +332,10 @@ export function SystemSettings({
             <div className="grid grid-cols-3 gap-4">
               <button
                 onClick={() => setTheme("light")}
-                className={`p-4 border-2 rounded-lg transition-all ${
-                  theme === "light"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
+                className={`p-4 border-2 rounded-lg transition-all ${theme === "light"
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-gray-200 hover:border-gray-300"
+                  }`}
               >
                 <div className="flex flex-col items-center space-y-2">
                   <div className="w-12 h-12 bg-white border-2 border-gray-300 rounded-lg flex items-center justify-center">
@@ -350,11 +347,10 @@ export function SystemSettings({
 
               <button
                 onClick={() => setTheme("dark")}
-                className={`p-4 border-2 rounded-lg transition-all ${
-                  theme === "dark"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
+                className={`p-4 border-2 rounded-lg transition-all ${theme === "dark"
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-gray-200 hover:border-gray-300"
+                  }`}
               >
                 <div className="flex flex-col items-center space-y-2">
                   <div className="w-12 h-12 bg-gray-800 border-2 border-gray-700 rounded-lg flex items-center justify-center">
@@ -366,11 +362,10 @@ export function SystemSettings({
 
               <button
                 onClick={() => setTheme("auto")}
-                className={`p-4 border-2 rounded-lg transition-all ${
-                  theme === "auto"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
+                className={`p-4 border-2 rounded-lg transition-all ${theme === "auto"
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-gray-200 hover:border-gray-300"
+                  }`}
               >
                 <div className="flex flex-col items-center space-y-2">
                   <div className="w-12 h-12 bg-gradient-to-br from-white to-gray-800 border-2 border-gray-400 rounded-lg flex items-center justify-center">
@@ -1165,7 +1160,8 @@ export function SystemSettings({
         userRole={userRole}
         onNavigateToNotifications={onNavigateToNotifications}
         unreadCount={unreadCount}
-        onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
+
+        onProfileClick={(tab) => onNavigateToUserProfile?.(tab)}
       />
 
       <div className="flex flex-1">
@@ -1189,11 +1185,10 @@ export function SystemSettings({
                 <button
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                    isActive
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${isActive
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-700 hover:bg-gray-100"
+                    }`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className={isActive ? "" : ""}>{item.label}</span>
@@ -1221,14 +1216,7 @@ export function SystemSettings({
         </div>
       </div>
 
-      <ProfileSettingsModal
-        open={profileModal.open}
-        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
-        role={userRole as "admin"}
-        userName="Admin User"
-        email="admin@attendance.com"
-        defaultTab={profileModal.tab}
-      />
+
     </div>
   );
 }

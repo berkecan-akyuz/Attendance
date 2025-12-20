@@ -13,15 +13,15 @@ export function FaceCapture({ capturedImages, onCapture, onRemove }: FaceCapture
   const canCapture = capturedImages.length < maxImages;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
         <h2 className="text-gray-900 mb-1">Face Capture</h2>
-        <p className="text-gray-500">Capture multiple face images for better recognition</p>
+        <p className="text-gray-500 text-sm">Capture multiple face images for better recognition</p>
       </div>
 
       {/* Camera Preview */}
-      <div className="space-y-4">
-        <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-[4/3] flex items-center justify-center border-2 border-dashed border-gray-300">
+      <div className="space-y-2">
+        <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-video flex items-center justify-center border-2 border-dashed border-gray-300">
           {/* Camera placeholder */}
           <div className="text-center">
             <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -37,13 +37,7 @@ export function FaceCapture({ capturedImages, onCapture, onRemove }: FaceCapture
           </div>
         </div>
 
-        {/* Guidelines */}
-        <Alert className="bg-blue-50 border-blue-200">
-          <Info className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-900">
-            <strong>Guidelines:</strong> Look directly at camera, ensure good lighting, avoid shadows, and maintain a neutral expression.
-          </AlertDescription>
-        </Alert>
+
 
         {/* Capture Button and Counter */}
         <div className="space-y-3">
@@ -55,7 +49,7 @@ export function FaceCapture({ capturedImages, onCapture, onRemove }: FaceCapture
             <Camera className="mr-2 h-4 w-4" />
             Capture Face Image
           </Button>
-          
+
           <div className="text-center">
             <span className={`${capturedImages.length >= 3 ? 'text-green-600' : 'text-gray-600'}`}>
               {capturedImages.length}/{maxImages} images captured

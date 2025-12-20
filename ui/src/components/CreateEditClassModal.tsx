@@ -41,6 +41,7 @@ interface Class {
   };
   room: string;
   camera: string;
+  cameraId?: string | null;
   semester: string;
   year: string;
 }
@@ -51,6 +52,7 @@ interface CreateEditClassModalProps {
   onClose: () => void;
   teachers: Teacher[];
   cameras: Array<{ id: number; name: string; location: string }>;
+  departments: string[];
 }
 
 export function CreateEditClassModal({
@@ -59,32 +61,26 @@ export function CreateEditClassModal({
   onClose,
   teachers,
   cameras,
+  departments,
 }: CreateEditClassModalProps) {
+  console.log("CreateEditClassModal mounting", { classData });
+
   const [formData, setFormData] = useState({
     code: classData?.code || "",
     name: classData?.name || "",
     department: classData?.department || "",
-    teacherId: classData?.teacher?.id ? String(classData.teacher.id) : "none",
+    teacherId: (classData?.teacher && classData.teacher.id) ? String(classData.teacher.id) : "none",
     semester: classData?.semester || "3",
-    year: classData?.year || "2024",
-    days: classData?.schedule.days || [],
-    startTime: classData?.schedule.startTime || "09:00",
-    endTime: classData?.schedule.endTime || "10:30",
+    year: classData?.year || "2025",
+    days: classData?.schedule?.days || [],
+    startTime: classData?.schedule?.startTime || "09:00",
+    endTime: classData?.schedule?.endTime || "10:30",
     room: classData?.room || "",
-    camera: classData?.camera || "",
-    maxCapacity: classData?.enrollment.max || 30,
+    camera: classData?.cameraId ? String(classData.cameraId) : "none",
+    maxCapacity: (classData?.enrollment && classData.enrollment.max) ? classData.enrollment.max : 30,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const departments = [
-    "Computer Science",
-    "Mathematics",
-    "English",
-    "Physics",
-    "Chemistry",
-    "Biology",
-  ];
 
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -132,10 +128,6 @@ export function CreateEditClassModal({
       newErrors.room = "Room/Location is required";
     }
 
-    if (!formData.camera) {
-      newErrors.camera = "Camera assignment is required";
-    }
-
     if (formData.maxCapacity < 1) {
       newErrors.maxCapacity = "Capacity must be at least 1";
     }
@@ -156,12 +148,12 @@ export function CreateEditClassModal({
         department: formData.department,
         teacher: selectedTeacher
           ? {
-              id: selectedTeacher.id,
-              name: selectedTeacher.name,
-            }
+            id: selectedTeacher.id,
+            name: selectedTeacher.name,
+          }
           : null,
         enrollment: {
-          current: classData?.enrollment.current || 0,
+          current: classData?.enrollment?.current || 0,
           max: formData.maxCapacity,
         },
         schedule: {
@@ -170,11 +162,11 @@ export function CreateEditClassModal({
           endTime: formData.endTime,
         },
         room: formData.room,
-        camera: formData.camera,
+        camera: formData.camera !== "none" ? formData.camera : "", // keep internal logic for display name if needed, or update if ignored
         semester: formData.semester,
         year: formData.year,
         teacherId: selectedTeacher?.id ?? null,
-        cameraId: formData.camera ? Number(formData.camera) : null,
+        cameraId: (formData.camera && formData.camera !== "none") ? Number(formData.camera) : null,
       });
     }
   };
@@ -344,9 +336,9 @@ export function CreateEditClassModal({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="2024">2024</SelectItem>
                     <SelectItem value="2025">2025</SelectItem>
                     <SelectItem value="2026">2026</SelectItem>
+                    <SelectItem value="2027">2027</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -365,11 +357,10 @@ export function CreateEditClassModal({
                 {weekDays.map((day) => (
                   <label
                     key={day}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-colors ${
-                      formData.days.includes(day)
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-colors ${formData.days.includes(day)
+                      ? "border-blue-600 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
+                      }`}
                   >
                     <Checkbox
                       checked={formData.days.includes(day)}
@@ -434,7 +425,7 @@ export function CreateEditClassModal({
 
               <div className="space-y-2">
                 <Label htmlFor="camera">
-                  Camera Assignment <span className="text-red-500">*</span>
+                  Camera Assignment
                 </Label>
                 <Select
                   value={formData.camera}
@@ -447,6 +438,7 @@ export function CreateEditClassModal({
                     <SelectValue placeholder="Select camera" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">No camera assigned</SelectItem>
                     {cameras.map((camera) => (
                       <SelectItem key={camera.id} value={String(camera.id)}>
                         {camera.name} - {camera.location}

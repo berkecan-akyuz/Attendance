@@ -10,6 +10,7 @@ import { StudentPortal } from "./components/StudentPortal";
 import { SystemSettings } from "./components/SystemSettings";
 import { LiveMonitoring } from "./components/LiveMonitoring";
 import { NotificationsPanel } from "./components/NotificationsPanel";
+import { UserProfilePage } from "./components/UserProfilePage";
 import { AuthPayload, fetchNotifications } from "./lib/api";
 
 type AdminSection = "Dashboard" | "Users" | "Classes" | "Cameras" | "Reports" | "Settings";
@@ -27,11 +28,14 @@ export default function App() {
     | "settings"
     | "live"
     | "notifications"
+    | "user-profile"
   >("login");
-  const [userRole, setUserRole] = useState<string>("");
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [auth, setAuth] = useState<AuthPayload | null>(null);
   const [adminSection, setAdminSection] = useState<AdminSection>("Dashboard");
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  const [activeProfileTab, setActiveProfileTab] = useState("profile");
 
   useEffect(() => {
     const loadNotifications = async () => {
@@ -100,6 +104,11 @@ export default function App() {
     setCurrentPage("notifications");
   };
 
+  const handleNavigateToUserProfile = (tab: string = "profile") => {
+    setActiveProfileTab(tab);
+    setCurrentPage("user-profile");
+  };
+
   const handleBackToDashboard = () => {
     if (userRole === "admin") {
       handleAdminSectionChange("Dashboard");
@@ -132,6 +141,7 @@ export default function App() {
           activeSection={adminSection}
           onSectionChange={handleAdminSectionChange}
           unreadCount={unreadNotifications}
+          onNavigateToUserProfile={handleNavigateToUserProfile}
         />
       )}
       {currentPage === "register" && (
@@ -145,6 +155,7 @@ export default function App() {
           onNavigateToReports={handleNavigateToReports}
           onNavigateToLive={handleNavigateToLive}
           onNavigateToNotifications={handleNavigateToNotifications}
+          onNavigateToUserProfile={handleNavigateToUserProfile}
         />
       )}
       {currentPage === "cameras" && userRole === "admin" && (
@@ -157,6 +168,7 @@ export default function App() {
           onNavigateToReports={handleNavigateToReports}
           userRole={userRole}
           unreadCount={unreadNotifications}
+          onNavigateToUserProfile={handleNavigateToUserProfile}
         />
       )}
       {currentPage === "reports" && (
@@ -170,6 +182,7 @@ export default function App() {
           onNavigateToDashboard={handleAdminSectionChange}
           onNavigateToCameras={handleNavigateToCameras}
           unreadCount={unreadNotifications}
+          onNavigateToUserProfile={handleNavigateToUserProfile}
         />
       )}
       {currentPage === "student" && userRole === "student" && (
@@ -177,6 +190,7 @@ export default function App() {
           userId={auth?.user_id}
           onLogout={handleLogout}
           onNavigateToNotifications={handleNavigateToNotifications}
+          onNavigateToUserProfile={handleNavigateToUserProfile}
         />
       )}
       {currentPage === "settings" && userRole === "admin" && (
@@ -189,10 +203,11 @@ export default function App() {
           onNavigateToCameras={handleNavigateToCameras}
           userRole={userRole}
           unreadCount={unreadNotifications}
+          onNavigateToUserProfile={handleNavigateToUserProfile}
         />
       )}
       {currentPage === "live" && (userRole === "admin" || userRole === "teacher") && (
-        <LiveMonitoring 
+        <LiveMonitoring
           onBack={handleBackToDashboard}
           userRole={userRole as "admin" | "teacher"}
         />
@@ -202,6 +217,19 @@ export default function App() {
           onBack={handleBackToDashboard}
           userRole={userRole as "admin" | "teacher" | "student"}
           onUnreadChange={setUnreadNotifications}
+        />
+      )}
+      {currentPage === "user-profile" && (
+        <UserProfilePage
+          userRole={userRole as "admin" | "teacher" | "student"}
+          userData={auth ? {
+            name: auth.full_name,
+            email: auth.email,
+            id: auth.username
+          } : undefined}
+          onBack={handleBackToDashboard}
+          onLogout={handleLogout}
+          defaultTab={activeProfileTab}
         />
       )}
     </>

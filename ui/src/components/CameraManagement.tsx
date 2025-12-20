@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { CameraConfigModal } from "./CameraConfigModal";
 import { DashboardNav } from "./DashboardNav";
-import { ProfileSettingsModal } from "./ProfileSettingsModal";
+
 import {
   Camera,
   Settings,
-  Trash2, 
+  Trash2,
   Plus,
   Wifi,
   WifiOff,
@@ -42,27 +42,28 @@ interface CameraManagementProps {
   onNavigateToNotifications?: () => void;
   onNavigateToDashboard?: (section?: string) => void;
   onNavigateToReports?: () => void;
+  onNavigateToUserProfile?: (tab?: string) => void;
   userRole?: string;
+
   unreadCount?: number;
 }
 
 export function CameraManagement({
   onBack,
-  onLogout = () => {},
-  onNavigateToSettings = () => {},
-  onNavigateToNotifications = () => {},
-  onNavigateToDashboard = () => {},
-  onNavigateToReports = () => {},
+  onLogout = () => { },
+  onNavigateToSettings = () => { },
+  onNavigateToNotifications = () => { },
+  onNavigateToDashboard = () => { },
+  onNavigateToReports = () => { },
+  onNavigateToUserProfile = () => { },
   userRole = "admin",
+
   unreadCount = 0
 }: CameraManagementProps) {
   const [activeFilter, setActiveFilter] = useState<"all" | "online" | "offline" | "unassigned">("all");
   const [editingCamera, setEditingCamera] = useState<CameraData | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [profileModal, setProfileModal] = useState<{
-    open: boolean;
-    tab: "profile" | "security" | "preferences";
-  }>({ open: false, tab: "profile" });
+
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
   const [cameras, setCameras] = useState<CameraData[]>([]);
   const [classOptions, setClassOptions] = useState<
@@ -91,7 +92,7 @@ export function CameraManagement({
           name: cam.camera_name,
           location: cam.location,
           streamUrl: cam.stream_url,
-          ipAddress: cam.stream_url.replace("rtsp://", "").split(":")[0] || "",
+          ipAddress: cam.stream_url.replace(/^(rtsp|http|https):\/\//, "").split(/[:/]/)[0] || "",
           status: (cam.status || "online").toLowerCase() as CameraData["status"],
           lastHeartbeat: cam.last_checked || "",
           assignedClass:
@@ -189,13 +190,13 @@ export function CameraManagement({
           cameras.map((cam) =>
             cam.id === cameraData.id
               ? {
-                  ...cameraData,
-                  assignedClass:
-                    updated.lecture_name ||
-                    classOptions.find((cls) => cls.id === cameraData.assignedLectureId)?.name ||
-                    cameraData.assignedClass,
-                  assignedLectureId: cameraData.assignedLectureId || null,
-                }
+                ...cameraData,
+                assignedClass:
+                  updated.lecture_name ||
+                  classOptions.find((cls) => cls.id === cameraData.assignedLectureId)?.name ||
+                  cameraData.assignedClass,
+                assignedLectureId: cameraData.assignedLectureId || null,
+              }
               : cam
           )
         );
@@ -241,17 +242,10 @@ export function CameraManagement({
         onNavigateToSettings={onNavigateToSettings}
         onNavigateToNotifications={onNavigateToNotifications}
         unreadCount={unreadCount}
-        onProfileClick={(tab) => setProfileModal({ open: true, tab: tab || "profile" })}
+        onProfileClick={(tab) => onNavigateToUserProfile(tab)}
       />
 
-      <ProfileSettingsModal
-        open={profileModal.open}
-        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
-        role="admin"
-        userName="Admin User"
-        email="admin@attendance.com"
-        defaultTab={profileModal.tab}
-      />
+
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -359,9 +353,8 @@ export function CameraManagement({
                     }
                   >
                     <div
-                      className={`w-2 h-2 rounded-full mr-1.5 ${
-                        camera.status === "online" ? "bg-green-500" : "bg-red-500"
-                      }`}
+                      className={`w-2 h-2 rounded-full mr-1.5 ${camera.status === "online" ? "bg-green-500" : "bg-red-500"
+                        }`}
                     ></div>
                     {camera.status === "online" ? "Online" : "Offline"}
                   </Badge>

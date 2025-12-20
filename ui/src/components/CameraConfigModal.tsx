@@ -58,7 +58,14 @@ export function CameraConfigModal({
       alert("Please fill in all required fields");
       return;
     }
-    onSave(formData);
+
+    const dataToSave = { ...formData };
+    if (!dataToSave.streamUrl && dataToSave.ipAddress) {
+      // Auto-generate RTSP URL if not provided
+      dataToSave.streamUrl = `rtsp://${dataToSave.ipAddress}:554/stream1`;
+    }
+
+    onSave(dataToSave);
   };
 
   return (

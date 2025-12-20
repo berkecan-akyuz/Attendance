@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -38,8 +38,9 @@ import {
   ChevronRight,
   Bell,
 } from "lucide-react";
-import { fetchStudentDashboard, StudentDashboard } from "../lib/api";
-import { ProfileSettingsModal } from "./ProfileSettingsModal";
+import { fetchStudentDashboard, StudentDashboard, submitCorrectionRequest } from "../lib/api";
+// ProfileSettingsModal import removed
+
 
 interface AttendanceRecord {
   id: string;
@@ -54,9 +55,10 @@ interface StudentPortalProps {
   userId?: number | null;
   onLogout: () => void;
   onNavigateToNotifications: () => void;
+  onNavigateToUserProfile?: (tab?: string) => void;
 }
 
-export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: StudentPortalProps) {
+export function StudentPortal({ userId, onLogout, onNavigateToNotifications, onNavigateToUserProfile }: StudentPortalProps) {
   const [selectedFilter, setSelectedFilter] = useState("thisMonth");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [requestingCorrection, setRequestingCorrection] = useState<AttendanceRecord | null>(null);
@@ -65,10 +67,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profileModal, setProfileModal] = useState<{
-    open: boolean;
-    tab: "profile" | "security" | "preferences";
-  }>({ open: false, tab: "profile" });
+  // Modal state removed
 
   useEffect(() => {
     const load = async () => {
@@ -84,7 +83,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
           class: record.lecture,
           status: record.status as AttendanceRecord["status"],
           timeIn: record.time_in || "-",
-          verificationMethod: record.verification_method === "Manual" ? "manual" : "auto",
+          verificationMethod: (record.verification_method === "Manual" ? "manual" : "auto") as "auto" | "manual",
         }));
         setAttendanceRecords(mapped);
       } catch (err) {
@@ -152,19 +151,26 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
     alert("Your attendance report is being downloaded!");
   };
 
-  const handleSubmitCorrection = (reason: string) => {
-    console.log("Submitting correction request:", {
-      record: requestingCorrection,
-      reason,
-    });
-    alert("Your correction request has been submitted for review!");
-    setRequestingCorrection(null);
+  const handleSubmitCorrection = async (reason: string) => {
+    if (!userId || !requestingCorrection) return;
+
+    try {
+      // Extract numeric ID from "record-123"
+      const attendanceId = parseInt(requestingCorrection.id.replace("record-", ""));
+      if (isNaN(attendanceId)) throw new Error("Invalid attendance ID");
+
+      await submitCorrectionRequest(attendanceId, userId, reason);
+      alert("Your correction request has been submitted successfully!");
+      setRequestingCorrection(null);
+    } catch (err) {
+      alert("Failed to submit request: " + (err instanceof Error ? err.message : "Unknown error"));
+    }
   };
 
   // Filter attendance records based on selected filter
   const getFilteredRecords = () => {
     const now = new Date();
-    
+
     if (selectedFilter === "thisWeek") {
       const weekAgo = new Date(now);
       weekAgo.setDate(now.getDate() - 7);
@@ -173,7 +179,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
         return recordDate >= weekAgo && recordDate <= now;
       });
     }
-    
+
     if (selectedFilter === "thisMonth") {
       const monthAgo = new Date(now);
       monthAgo.setMonth(now.getMonth() - 1);
@@ -182,7 +188,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
         return recordDate >= monthAgo && recordDate <= now;
       });
     }
-    
+
     // custom or default - show all
     return attendanceRecords;
   };
@@ -252,7 +258,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
                     <Avatar className="h-10 w-10">
                       <AvatarImage src="" alt={studentName} />
                       <AvatarFallback className="bg-blue-100 text-blue-600">
-                        {studentName.split(" ").map((n) => n[0]).join("")}
+                        {studentName.split(" ").map((n: string) => n[0]).join("")}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -267,7 +273,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onSelect={() => {
-                      setProfileModal({ open: true, tab: "profile" });
+                      onNavigateToUserProfile?.("profile");
                     }}
                   >
                     <User className="mr-2 h-4 w-4" />
@@ -275,7 +281,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
-                      setProfileModal({ open: true, tab: "security" });
+                      onNavigateToUserProfile?.("security");
                     }}
                   >
                     <Settings className="mr-2 h-4 w-4" />
@@ -297,15 +303,7 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
         </div>
       </nav>
 
-      <ProfileSettingsModal
-        open={profileModal.open}
-        onClose={() => setProfileModal((prev) => ({ ...prev, open: false }))}
-        role="student"
-        userName={studentName}
-        email={dashboard?.student?.user?.email || "student@attendance.com"}
-        identifier={rollNumber}
-        defaultTab={profileModal.tab}
-      />
+
 
       <div className="max-w-7xl mx-auto px-6 py-4 space-y-2">
         {error && (
@@ -436,9 +434,8 @@ export function StudentPortal({ userId, onLogout, onNavigateToNotifications }: S
                     <button
                       key={day}
                       onClick={() => attendance && setSelectedDate(date)}
-                      className={`aspect-square rounded-lg ${bgColor} hover:opacity-80 transition-opacity flex items-center justify-center ${
-                        isToday ? "ring-2 ring-blue-500" : ""
-                      } ${attendance ? "cursor-pointer" : "cursor-default"}`}
+                      className={`aspect-square rounded-lg ${bgColor} hover:opacity-80 transition-opacity flex items-center justify-center ${isToday ? "ring-2 ring-blue-500" : ""
+                        } ${attendance ? "cursor-pointer" : "cursor-default"}`}
                     >
                       <span className="text-gray-900">{day}</span>
                     </button>

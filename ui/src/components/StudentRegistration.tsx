@@ -24,7 +24,7 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
     department: "",
     email: "",
     phoneNumber: "",
-    dateOfBirth: "",
+
     password: "",
   });
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -122,7 +122,7 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-6 py-2">
         <div className="max-w-7xl mx-auto flex items-center space-x-4">
           <Button variant="ghost" size="icon" onClick={handleCancel}>
             <ArrowLeft className="w-5 h-5" />
@@ -135,10 +135,10 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="max-w-7xl mx-auto px-6 py-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Left Panel - Form Fields */}
-          <Card className="p-6">
+          <Card className="p-4">
             <StudentForm
               formData={formData}
               setFormData={setFormData}
@@ -148,16 +148,17 @@ export function StudentRegistration({ onBack, registeredBy }: StudentRegistratio
           </Card>
 
           {/* Right Panel - Face Capture */}
-          <Card className="p-6">
+          <Card className="p-4">
             <FaceCapture
               capturedImages={capturedImages}
               onCapture={handleCaptureImage}
+              onRemove={handleRemoveImage}
             />
           </Card>
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="mt-8 flex items-center justify-between bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <div className="mt-4 flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
           <div className="text-gray-600">
             {capturedImages.length >= 3 ? (
               <span className="text-green-600">✓ Ready to submit</span>

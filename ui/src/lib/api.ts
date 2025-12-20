@@ -12,6 +12,22 @@ export interface AuthPayload {
   last_login?: string | null;
 }
 
+export interface Student {
+  student_id: number;
+  user_id: number;
+  roll_number: string;
+  full_name: string;
+  email?: string;
+  lecture?: string;
+  enrollment_status?: string;
+  // Stats
+  total_classes?: number;
+  present?: number;
+  absent?: number;
+  late?: number;
+  attendance_percentage?: number;
+}
+
 export interface CreateUserPayload {
   username: string;
   password: string;
@@ -113,9 +129,9 @@ export interface CameraResponse {
   location: string;
   stream_url: string;
   assigned_lecture_id: number | null;
-  status: string;
+  status: "Online" | "Offline" | "Error" | "Maintenance";
   last_checked: string | null;
-  lecture?: any;
+  lecture?: any; // Keeping original type as `Lecture` interface is not defined in the provided snippet
   lecture_name?: string;
 }
 
@@ -126,6 +142,7 @@ export interface NotificationItem {
   message: string;
   severity: "info" | "medium" | "high" | string;
   timestamp: string;
+  read?: boolean;
 }
 
 export interface LecturePayload {
@@ -297,30 +314,14 @@ export async function fetchTeacherStats(userId: number): Promise<TeacherStats> {
   return payload as TeacherStats;
 }
 
-export async function fetchTeacherStudents(userId: number): Promise<
-  Array<{
-    student_id: number;
-    roll_number: string;
-    full_name: string;
-    email?: string;
-    lecture: string;
-    enrollment_status: string;
-  }>
-> {
+export async function fetchTeacherStudents(userId: number): Promise<Student[]> {
   const response = await fetch(withBase(`/api/teachers/${userId}/students`));
   const payload = await response.json().catch(() => []);
   if (!response.ok) {
     const message = (payload && (payload.error as string)) || "Unable to load students";
     throw new Error(message);
   }
-  return payload as Array<{
-    student_id: number;
-    roll_number: string;
-    full_name: string;
-    email?: string;
-    lecture: string;
-    enrollment_status: string;
-  }>;
+  return payload as Student[];
 }
 
 export async function fetchLectureSummaries(options?: { teacherUserId?: number }): Promise<LectureSummary[]> {
@@ -485,14 +486,14 @@ export async function enrollStudentInLecture(
   return payload;
 }
 
-export async function fetchLectureStudents(lectureId: number): Promise<any[]> {
+export async function fetchLectureStudents(lectureId: number): Promise<Student[]> {
   const response = await fetch(withBase(`/api/lectures/${lectureId}/students`));
   const payload = await response.json().catch(() => []);
   if (!response.ok) {
     const message = (payload && (payload.error as string)) || "Unable to load class students";
     throw new Error(message);
   }
-  return payload as any[];
+  return payload as Student[];
 }
 
 export async function removeStudentFromLecture(
@@ -555,6 +556,116 @@ export async function requestPasswordReset(email: string): Promise<{ message: st
     throw new Error((payload && payload.error) || "Unable to submit reset request");
   }
   return payload as { message: string; user_id?: number };
+}
+
+export async function changePassword(input: { user_id: number; current_password: string; new_password: string }): Promise<void> {
+  const response = await fetch(withBase("/api/change-password"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to update password");
+  }
+}
+
+export async function batchMarkAttendance(
+  records: Array<{ session_id: number; user_id: number; status: string }>,
+  verified_by: number
+): Promise<void> {
+  const response = await fetch(withBase("/api/attendance/batch"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ records, verified_by }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to update attendance records");
+  }
+}
+
+export async function getOrCreateSession(lectureName: string, date: string): Promise<{ session_id: number; existing_records: Record<number, string>; status?: string }> {
+  const response = await fetch(withBase("/api/sessions/get-or-create"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lecture_name: lectureName, date }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to get or create session");
+  }
+  return payload as { session_id: number; existing_records: Record<number, string>; status?: string };
+}
+
+export async function lockSession(sessionId: number): Promise<void> {
+  const response = await fetch(withBase(`/api/sessions/${sessionId}/lock`), {
+    method: "POST",
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error((payload && payload.error) || "Unable to lock session");
+  }
+}
+
+export interface CorrectionRequest {
+  request_id: number;
+  attendance_id: number;
+  requesting_user_id: number;
+  requesting_user_name?: string;
+  reason: string;
+  requested_at: string;
+  status: "Pending" | "Approved" | "Rejected";
+  reviewed_by?: number;
+  reviewed_by_name?: string;
+  reviewed_at?: string;
+  review_notes?: string;
+  attendance_details?: {
+    date: string;
+    lecture_name: string;
+    current_status: string;
+  };
+}
+
+export async function submitCorrectionRequest(attendance_id: number, user_id: number, reason: string): Promise<CorrectionRequest> {
+  const response = await fetch(withBase("/api/attendance/correction"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attendance_id, user_id, reason }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to submit request");
+  }
+  return payload as CorrectionRequest;
+}
+
+export async function fetchCorrectionRequests(teacher_id?: number): Promise<CorrectionRequest[]> {
+  const query = teacher_id ? `?teacher_id=${teacher_id}` : "";
+  const response = await fetch(withBase(`/api/attendance/correction${query}`));
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error((payload && (payload.error as string)) || "Unable to load requests");
+  }
+  return payload as CorrectionRequest[];
+}
+
+export async function resolveCorrectionRequest(
+  req_id: number,
+  status: "Approved" | "Rejected",
+  reviewed_by: number,
+  notes?: string
+): Promise<CorrectionRequest> {
+  const response = await fetch(withBase(`/api/attendance/correction/${req_id}/resolve`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, reviewed_by, notes }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload && payload.error) || "Unable to resolve request");
+  }
+  return payload as CorrectionRequest;
 }
 
 export const API_BASE_URL = normalizedBase || "(proxy)";

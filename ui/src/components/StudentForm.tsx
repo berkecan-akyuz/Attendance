@@ -8,6 +8,16 @@ import {
   SelectValue,
 } from "./ui/select";
 import type { Department } from "../lib/api";
+import { Button } from "./ui/button";
+import { Calendar } from "./ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "./ui/popover";
+import { format } from "date-fns";
+import { cn } from "./ui/utils";
+import { CalendarIcon } from "lucide-react";
 
 interface StudentFormProps {
   formData: {
@@ -16,7 +26,7 @@ interface StudentFormProps {
     department: string;
     email: string;
     phoneNumber: string;
-    dateOfBirth: string;
+
     password: string;
   };
   departments: Department[];
@@ -35,13 +45,12 @@ export function StudentForm({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       <div>
         <h2 className="text-gray-900 mb-1">Student Information</h2>
-        <p className="text-gray-500">Fill in the student's personal details</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         {/* Full Name */}
         <div className="space-y-2">
           <Label htmlFor="fullName">
@@ -87,8 +96,8 @@ export function StudentForm({
                 departmentsLoading
                   ? "Loading departments..."
                   : departments.length
-                  ? "Select department"
-                  : "No departments available"
+                    ? "Select department"
+                    : "No departments available"
               } />
             </SelectTrigger>
             <SelectContent>
@@ -148,16 +157,7 @@ export function StudentForm({
           />
         </div>
 
-        {/* Date of Birth */}
-        <div className="space-y-2">
-          <Label htmlFor="dateOfBirth">Date of Birth</Label>
-          <Input
-            id="dateOfBirth"
-            type="date"
-            value={formData.dateOfBirth}
-            onChange={(e) => handleChange("dateOfBirth", e.target.value)}
-          />
-        </div>
+
       </div>
     </div>
   );

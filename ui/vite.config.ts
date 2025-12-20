@@ -1,12 +1,24 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: path.resolve(__dirname, '../tests/setup.ts'),
+    include: ['../tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+  },
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     alias: {
+      '@testing-library/jest-dom': path.resolve(__dirname, './node_modules/@testing-library/jest-dom'),
+      '@testing-library/react': path.resolve(__dirname, './node_modules/@testing-library/react'),
+      '@testing-library/user-event': path.resolve(__dirname, './node_modules/@testing-library/user-event'),
+      'react': path.resolve(__dirname, './node_modules/react'),
+      'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
       'vaul@1.1.2': 'vaul',
       'sonner@2.0.3': 'sonner',
       'recharts@2.15.2': 'recharts',
@@ -58,6 +70,9 @@ export default defineConfig({
     port: 3000,
     host: true,
     open: true,
+    fs: {
+      allow: ['..'],
+    },
     proxy: {
       "/api": {
         // Keeping the 127.0.0.1 version as it is safer for Flask/Node setups
